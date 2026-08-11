@@ -32,8 +32,7 @@ Changesets are normally unnecessary for private apps, tests, repository configur
 1. Changes are merged into `main` with their changeset files.
 2. The release workflow creates or updates a **Version Packages** pull request.
 3. That pull request applies package versions and changelogs. It also synchronizes versions into any matching `jsr.json` files.
-4. Merging the version pull request publishes changed public packages to npm and creates package tags and GitHub releases.
-5. Each GitHub release triggers the JSR workflow. If the released package contains `jsr.json`, the same version is published to JSR.
+4. Merging the version pull request publishes changed public packages to npm, publishes matching `jsr.json` packages to JSR, and creates package tags and GitHub releases.
 
 The npm and JSR workflows use GitHub OIDC trusted publishing. They should not require long-lived registry tokens.
 
@@ -42,7 +41,7 @@ The npm and JSR workflows use GitHub OIDC trusted publishing. They should not re
 Before the first release:
 
 - Confirm the selected npm package names are available or that the publishing account has access to them.
-- Configure each npm package's trusted publisher for `.github/workflows/release.yml`.
+- Configure each npm package's trusted publisher for `release.yml`.
 - Configure each JSR package's GitHub publishing integration for this repository.
 - Ensure every public package's repository URL exactly matches the final GitHub repository.
 - Enable GitHub Actions to create pull requests in the repository settings.
