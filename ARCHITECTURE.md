@@ -24,23 +24,23 @@ Dependencies flow toward the bottom of the diagram. Lower-level packages must ne
 
 ## Package boundaries
 
-### `@constructa/schema`
+### `constructa-schema`
 
 Owns the portable, serializable generator-definition format and its validation types. It must not depend on the execution engine, a user interface, persistence, or network code.
 
-### `@constructa/core`
+### `constructa-core`
 
 Owns generator registration, execution, context, composition primitives, and structured errors. It may depend on the schema but must remain independent of all applications.
 
-### `@constructa/generators`
+### `constructa-generators`
 
 Owns the built-in primitive and composite generator implementations. New types should register with the core instead of adding type-specific branches to the executor.
 
-### `@constructa/exporters`
+### `constructa-exporters`
 
 Owns conversion of generated values into formats such as JSON, JSON Lines, CSV, and SQL. Generation and presentation concerns should not leak into this package.
 
-### `@constructa/sdk`
+### `constructa-sdk`
 
 Provides the stable, developer-facing API. It composes the lower-level packages and is the preferred entry point for application and third-party consumers.
 

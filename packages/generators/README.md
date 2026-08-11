@@ -1,4 +1,4 @@
-# `@constructa/generators`
+# `constructa-generators`
 
 Built-in generator implementations for Constructa.
 

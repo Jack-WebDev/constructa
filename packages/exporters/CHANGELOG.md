@@ -1,4 +1,4 @@
-# @constructa/exporters
+# constructa-exporters
 
 ## 0.0.1
 

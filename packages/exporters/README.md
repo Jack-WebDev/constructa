@@ -1,4 +1,4 @@
-# `@constructa/exporters`
+# `constructa-exporters`
 
 Output serialization and export formats for generated data.
 

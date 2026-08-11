@@ -64,12 +64,9 @@ for (const { directory, packageJson, jsrConfig } of selectedPackages) {
     throw new Error(`${packageJson.name} has jsr.json but is marked private`);
   }
 
-  if (
-    jsrConfig.name !== packageJson.name ||
-    jsrConfig.version !== packageJson.version
-  ) {
+  if (jsrConfig.version !== packageJson.version) {
     throw new Error(
-      `${packageJson.name} has mismatched package.json and jsr.json metadata`,
+      `${packageJson.name} has mismatched package.json and jsr.json versions`,
     );
   }
 
@@ -80,7 +77,7 @@ for (const { directory, packageJson, jsrConfig } of selectedPackages) {
   }
 
   console.log(
-    `${isDryRun ? "Validating" : "Publishing"} ${packageJson.name}@${packageJson.version}`,
+    `${isDryRun ? "Validating" : "Publishing"} ${jsrConfig.name}@${jsrConfig.version} from ${packageJson.name}`,
   );
   const result = spawnSync("jsr", args, {
     cwd: directory,

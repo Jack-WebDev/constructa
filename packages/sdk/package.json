@@ -1,5 +1,5 @@
 {
-  "name": "@constructa/sdk",
+  "name": "constructa-sdk",
   "version": "0.0.1",
   "description": "The supported developer-facing API for Constructa.",
   "private": false,
@@ -25,10 +25,10 @@
     "access": "public"
   },
   "dependencies": {
-    "@constructa/core": "workspace:*",
-    "@constructa/exporters": "workspace:*",
-    "@constructa/generators": "workspace:*",
-    "@constructa/schema": "workspace:*"
+    "constructa-core": "workspace:*",
+    "constructa-exporters": "workspace:*",
+    "constructa-generators": "workspace:*",
+    "constructa-schema": "workspace:*"
   },
   "devDependencies": {
     "@constructa/config": "workspace:*",

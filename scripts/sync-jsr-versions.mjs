@@ -54,12 +54,6 @@ for (const { directory, packageJson } of await findWorkspacePackages()) {
     throw new Error(`${packageJson.name} has jsr.json but is marked private`);
   }
 
-  if (jsrConfig.name !== packageJson.name) {
-    throw new Error(
-      `${jsrConfigPath} name (${jsrConfig.name}) does not match package.json (${packageJson.name})`,
-    );
-  }
-
   if (jsrConfig.version === packageJson.version) {
     continue;
   }

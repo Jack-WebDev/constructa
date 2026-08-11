@@ -1,4 +1,4 @@
-# `@constructa/schema`
+# `constructa-schema`
 
 Portable generator definitions, validation schemas, and related types shared by every Constructa interface.
 

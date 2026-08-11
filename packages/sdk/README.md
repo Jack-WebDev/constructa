@@ -1,4 +1,4 @@
-# `@constructa/sdk`
+# `constructa-sdk`
 
 Stable developer-facing API for configuring and running Constructa generators.
 
