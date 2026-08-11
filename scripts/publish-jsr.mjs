@@ -4,6 +4,7 @@ import { join } from "node:path";
 
 const workspaceRoots = ["apps", "packages"];
 const isDryRun = process.argv.includes("--dry-run");
+const allowDirty = process.argv.includes("--allow-dirty");
 const releaseTagIndex = process.argv.indexOf("--tag");
 const releaseTag =
   releaseTagIndex === -1 ? undefined : process.argv[releaseTagIndex + 1];
@@ -43,11 +44,7 @@ async function findJsrPackages() {
 const jsrPackages = await findJsrPackages();
 let selectedPackages = jsrPackages;
 
-if (!isDryRun) {
-  if (!releaseTag) {
-    throw new Error("Publishing requires a Changesets package tag via --tag");
-  }
-
+if (releaseTag) {
   selectedPackages = jsrPackages.filter(
     ({ packageJson }) =>
       `${packageJson.name}@${packageJson.version}` === releaseTag,
@@ -58,6 +55,8 @@ if (!isDryRun) {
     process.exit(0);
   }
 }
+
+let processedCount = 0;
 
 for (const { directory, packageJson, jsrConfig } of selectedPackages) {
   if (packageJson.private) {
@@ -70,10 +69,21 @@ for (const { directory, packageJson, jsrConfig } of selectedPackages) {
     );
   }
 
+  if (!isDryRun && isJsrVersionPublished(jsrConfig)) {
+    console.log(
+      `Skipping ${jsrConfig.name}@${jsrConfig.version}; already published on JSR.`,
+    );
+    continue;
+  }
+
   const args = ["publish"];
 
   if (isDryRun) {
     args.push("--dry-run");
+  }
+
+  if (allowDirty) {
+    args.push("--allow-dirty");
   }
 
   console.log(
@@ -92,10 +102,25 @@ for (const { directory, packageJson, jsrConfig } of selectedPackages) {
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
+
+  processedCount += 1;
 }
 
 console.log(
   selectedPackages.length === 0
     ? "No JSR packages are configured yet."
-    : `${isDryRun ? "Validated" : "Published"} ${selectedPackages.length} JSR package(s).`,
+    : `${isDryRun ? "Validated" : "Published"} ${processedCount} JSR package(s).`,
 );
+
+function isJsrVersionPublished(jsrConfig) {
+  const result = spawnSync(
+    "jsr",
+    ["info", `${jsrConfig.name}@${jsrConfig.version}`],
+    {
+      shell: process.platform === "win32",
+      stdio: "ignore",
+    },
+  );
+
+  return result.status === 0;
+}
