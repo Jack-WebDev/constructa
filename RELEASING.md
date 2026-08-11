@@ -7,11 +7,11 @@ Constructa uses Changesets to version packages and publish matching releases to 
 Workspace packages remain private until their public API and distribution artifacts are ready. To opt a package into releases:
 
 1. Set `private` to `false` in its `package.json`.
-2. Give it a valid version and a unique `@constructa/*` package name.
+2. Give it a valid version and a unique npm package name.
 3. Verify its compiled npm entrypoints, types, `files`, `exports`, and `publishConfig` metadata.
 4. Add repository, homepage, and issue-tracker URLs after the public repository URL is known.
 5. Verify its tsdown build produces the exact files included in the npm package.
-6. If the package will also be published to JSR, add a `jsr.json` file with the same name and version, explicit TypeScript entrypoints, and appropriate include/exclude rules.
+6. If the package will also be published to JSR, add a `jsr.json` file with its JSR package name, the same version, explicit TypeScript entrypoints, and appropriate include/exclude rules. JSR package names may differ from npm package names.
 
 Do not make a package public merely to test the release workflow. Registry versions are immutable.
 
@@ -41,7 +41,7 @@ The npm and JSR workflows use GitHub OIDC trusted publishing. They should not re
 
 Before the first release:
 
-- Create or claim the `@constructa` scope on npm and JSR.
+- Confirm the selected npm package names are available or that the publishing account has access to them.
 - Configure each npm package's trusted publisher for `.github/workflows/release.yml`.
 - Configure each JSR package's GitHub publishing integration for this repository.
 - Ensure every public package's repository URL exactly matches the final GitHub repository.

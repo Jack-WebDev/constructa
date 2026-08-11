@@ -1,5 +1,5 @@
 {
-  "name": "@constructa/exporters",
+  "name": "constructa-exporters",
   "version": "0.0.1",
   "description": "Output serializers and export formats for Constructa.",
   "private": false,

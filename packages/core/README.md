@@ -1,9 +1,33 @@
-# `@constructa/core`
+# `constructa-core`
 
-UI-agnostic generator registration and execution engine.
+UI-agnostic generator registration and execution engine for Constructa.
 
-Planned areas include the registry, executor, generation context, seeded randomness, composition lifecycle, and structured errors. The engine may consume `@constructa/schema`, but it must not depend on applications, UI, storage, or transport code.
+This package contains the core runtime responsible for registering, composing, and executing generators. It defines the fundamental behavior of the Constructa generation system without making assumptions about user interfaces, persistence, transport, or application environments.
 
-## Dependency boundary
+## Responsibilities
 
-`@constructa/schema` is this package's only allowed Constructa runtime dependency. Core must not import built-in generators, exporters, the SDK, applications, UI, environment, persistence, or transport code.
+Planned areas include:
+
+* Generator registry
+* Generator execution
+* Generation context
+* Seeded randomness
+* Generator composition and lifecycle
+* Structured errors
+
+## Dependency Boundary
+
+`constructa-schema` is the only Constructa runtime dependency that `constructa-core` may depend on.
+
+Core must not import or depend directly on:
+
+* Built-in generators
+* Exporters
+* SDK
+* Applications
+* UI components
+* Environment configuration
+* Persistence or storage
+* Transport or API code
+
+This boundary keeps the generator engine portable and independent of higher-level Constructa packages and applications.

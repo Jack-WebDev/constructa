@@ -5,4 +5,4 @@
 ### Patch Changes
 
 - Updated dependencies
-  - @constructa/sdk@0.0.1
+  - constructa-sdk@0.0.1

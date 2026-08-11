@@ -1,5 +1,5 @@
 {
-  "name": "@constructa/core",
+  "name": "constructa-core",
   "version": "0.0.1",
   "description": "The UI-agnostic Constructa generator execution engine.",
   "private": false,
@@ -25,7 +25,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@constructa/schema": "workspace:*"
+    "constructa-schema": "workspace:*"
   },
   "devDependencies": {
     "@constructa/config": "workspace:*",

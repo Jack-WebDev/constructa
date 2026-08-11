@@ -16,7 +16,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@constructa/sdk": "workspace:*"
+    "constructa-sdk": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

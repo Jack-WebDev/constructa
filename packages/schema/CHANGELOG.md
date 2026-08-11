@@ -1,4 +1,4 @@
-# @constructa/schema
+# constructa-schema
 
 ## 0.0.1
 
