@@ -218,7 +218,8 @@ The web application is available at [http://localhost:3001](http://localhost:300
 - `pnpm run dev:web` — start only the web application
 - `pnpm run build` — build all applications and packages
 - `pnpm run check-types` — run TypeScript checks across the monorepo
-- `pnpm run check` — check formatting and lint the repository with Biome
+- `pnpm run check` — check formatting, linting, and architecture boundaries
+- `pnpm run check:architecture` — validate workspace manifests and imports against the documented dependency graph
 - `pnpm run check:fix` — apply safe Biome formatting and lint fixes
 - `pnpm run test` — run all unit tests once with Vitest
 - `pnpm run test:watch` — run Vitest in watch mode
