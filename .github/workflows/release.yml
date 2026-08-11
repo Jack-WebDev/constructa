@@ -55,3 +55,7 @@ jobs:
           commit: "chore: release version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish JSR packages
+        if: steps.changesets.outputs.published == 'true'
+        run: pnpm run release:jsr

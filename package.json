@@ -24,7 +24,7 @@
     "changeset:status": "changeset status",
     "version-packages": "changeset version && node scripts/sync-jsr-versions.mjs",
     "release:version": "pnpm run version-packages",
-    "release:publish": "pnpm run build && changeset publish && pnpm run release:jsr",
+    "release:publish": "pnpm run build && changeset publish",
     "release:npm": "pnpm run build && changeset publish",
     "release:jsr": "node scripts/publish-jsr.mjs",
     "release:jsr:dry-run": "node scripts/publish-jsr.mjs --dry-run",
