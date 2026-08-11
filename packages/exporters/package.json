@@ -4,6 +4,11 @@
   "description": "Output serializers and export formats for Constructa.",
   "private": false,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jack-WebDev/constructa.git",
+    "directory": "packages/exporters"
+  },
   "type": "module",
   "files": [
     "dist"

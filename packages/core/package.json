@@ -4,6 +4,11 @@
   "description": "The UI-agnostic Constructa generator execution engine.",
   "private": false,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jack-WebDev/constructa.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "files": [
     "dist"

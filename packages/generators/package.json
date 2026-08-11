@@ -4,6 +4,11 @@
   "description": "Built-in primitive and composite generators for Constructa.",
   "private": false,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Jack-WebDev/constructa.git",
+    "directory": "packages/generators"
+  },
   "type": "module",
   "files": [
     "dist"
