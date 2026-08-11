@@ -1,0 +1,3 @@
+{
+  "extends": "@constructa/config/tsconfig.base.json"
+}
