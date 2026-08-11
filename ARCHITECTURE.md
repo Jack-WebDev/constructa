@@ -22,6 +22,26 @@ packages/core   |   packages/exporters
 
 Dependencies flow toward the bottom of the diagram. Lower-level packages must never import an application or a higher-level package.
 
+The enforceable workspace dependency policy is:
+
+| Workspace | Allowed Constructa runtime dependencies |
+| --- | --- |
+| `constructa-schema` | None |
+| `constructa-core` | `constructa-schema` |
+| `constructa-generators` | `constructa-core`, `constructa-schema` |
+| `constructa-exporters` | None |
+| `constructa-sdk` | `constructa-core`, `constructa-generators`, `constructa-exporters`, `constructa-schema` |
+| `@constructa/ui` | None |
+| `@constructa/env` | None |
+| `@constructa/config` | None |
+| `apps/web` | `constructa-sdk`, `@constructa/ui`, `@constructa/env` |
+| `apps/api` | `constructa-sdk`, `@constructa/env` |
+| `apps/cli` | `constructa-sdk`, `@constructa/env` |
+
+An allowed dependency is optional until a workspace needs it. Internal imports must use the dependency's package name and public exports; relative imports into another workspace are forbidden. Every imported workspace package must be declared in the importing package's manifest. `@constructa/config` is a development-only exception available to every workspace for shared tooling, and does not form part of the runtime graph. Third-party dependencies are governed by the ownership rules below rather than this internal graph.
+
+`pnpm run check:architecture` validates manifests and JavaScript/TypeScript imports against this policy. It is part of `pnpm run check`, so the same boundary validation runs in CI.
+
 ## Package boundaries
 
 ### `constructa-schema`
@@ -38,7 +58,7 @@ Owns the built-in primitive and composite generator implementations. New types s
 
 ### `constructa-exporters`
 
-Owns conversion of generated values into formats such as JSON, JSON Lines, CSV, and SQL. Generation and presentation concerns should not leak into this package.
+Owns conversion of plain generated values into formats such as JSON, JSON Lines, CSV, and SQL. It is independent of the other domain packages: generation, schema, and presentation concerns should not leak into this package.
 
 ### `constructa-sdk`
 

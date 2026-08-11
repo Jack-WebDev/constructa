@@ -66,7 +66,7 @@ pnpm run test
 pnpm run build
 ```
 
-Use `pnpm run check:fix` to apply safe Biome formatting and lint fixes.
+`pnpm run check` includes the architecture boundary validation. Use `pnpm run check:fix` to apply safe Biome formatting and lint fixes.
 
 Tests live beside the source they exercise and use `.test.ts` or `.test.tsx` filenames. Node is the default environment for engine, API, and CLI tests; web and UI tests run in jsdom. New behavior should include focused tests in the relevant application or package.
 
