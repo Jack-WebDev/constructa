@@ -1,8 +1,13 @@
 {
   "name": "@constructa/env",
   "version": "0.0.0",
+  "description": "Shared environment validation for Constructa applications.",
   "private": true,
+  "license": "MIT",
   "type": "module",
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
   "exports": {
     "./web": "./src/web.ts"
   },

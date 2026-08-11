@@ -1,0 +1,29 @@
+{
+  "name": "@constructa/cli",
+  "version": "0.0.0",
+  "description": "The command-line interface for running Constructa generators.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "constructa": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@constructa/sdk": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "packageManager": "pnpm@10.32.1"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@constructa/api",
+  "version": "0.0.0",
+  "description": "The future public API for Constructa.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "check-types": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@constructa/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

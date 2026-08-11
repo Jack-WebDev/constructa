@@ -1,9 +1,12 @@
 {
   "name": "web",
+  "description": "The Constructa web application and visual generator builder.",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "vite build",
+    "check-types": "tsc --noEmit",
     "serve": "vite preview",
     "dev": "vite dev"
   },
@@ -32,7 +35,7 @@
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@vitejs/plugin-react": "^6.0.4",
-    "jsdom": "^30.0.0",
+    "jsdom": "catalog:",
     "typescript": "catalog:",
     "vite": "^8.1.5",
     "web-vitals": "^6.0.1"

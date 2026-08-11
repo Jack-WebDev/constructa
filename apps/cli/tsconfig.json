@@ -1,0 +1,5 @@
+{
+  "extends": "@constructa/config/tsconfig.base.json",
+  "include": ["src/**/*.ts", "tsdown.config.ts"],
+  "exclude": ["node_modules", "**/*.test.ts", "**/*.spec.ts"]
+}

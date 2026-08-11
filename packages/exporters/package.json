@@ -1,0 +1,31 @@
+{
+  "name": "@constructa/exporters",
+  "version": "0.0.0",
+  "description": "Output serializers and export formats for Constructa.",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "check-types": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@constructa/config": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
