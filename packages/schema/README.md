@@ -18,6 +18,29 @@ Complete portable definitions must include `schemaVersion: 1`. `CURRENT_SCHEMA_V
 
 Use `isSchemaVersion`, `assertSchemaVersion`, `isVersionedDefinition`, `assertVersionedDefinition`, `findSchemaVersionValueFailure`, or `findSchemaVersionFailure` to reject missing or unsupported version markers with structured failures.
 
+## Definition envelope
+
+The canonical top-level generator definition document is:
+
+```json
+{
+  "schemaVersion": 1,
+  "type": "integer",
+  "configuration": {
+    "min": 1,
+    "max": 100
+  },
+  "name": "Small integer",
+  "description": "An integer in a bounded range."
+}
+```
+
+`schemaVersion`, `type`, and `configuration` are required. `type` must be a non-empty string, and `configuration` must be a JSON object. `name` and `description` are optional strings.
+
+Unknown top-level properties are rejected so all surfaces exchange one canonical document shape. Generator-specific data belongs inside `configuration`, where each generator can validate its own fields in later phases.
+
+Use `isDefinitionEnvelope`, `assertDefinitionEnvelope`, `parseDefinitionEnvelope`, `safeParseDefinitionEnvelope`, or `findDefinitionEnvelopeFailure` to validate the complete envelope.
+
 ## Dependency boundary
 
 This is the bottom of the domain dependency graph and has no Constructa runtime dependencies. In particular, it must not import core, generators, exporters, the SDK, applications, UI, environment, persistence, or transport code.
