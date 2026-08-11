@@ -12,6 +12,12 @@ Omit optional data by leaving the property out. `undefined` is not a portable va
 
 Use `isJsonValue`, `assertJsonValue`, or `findJsonValueError` to enforce this constraint before later schema-specific validation.
 
+## Schema version
+
+Complete portable definitions must include `schemaVersion: 1`. `CURRENT_SCHEMA_VERSION` identifies the version emitted by current Constructa tooling, and `SUPPORTED_SCHEMA_VERSIONS` lists the versions accepted by this package.
+
+Use `isSchemaVersion`, `assertSchemaVersion`, `isVersionedDefinition`, `assertVersionedDefinition`, `findSchemaVersionValueFailure`, or `findSchemaVersionFailure` to reject missing or unsupported version markers with structured failures.
+
 ## Dependency boundary
 
 This is the bottom of the domain dependency graph and has no Constructa runtime dependencies. In particular, it must not import core, generators, exporters, the SDK, applications, UI, environment, persistence, or transport code.

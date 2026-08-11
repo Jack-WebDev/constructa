@@ -8,6 +8,28 @@ export type JsonObject = {
   readonly [key: string]: JsonValue;
 };
 
+export const CURRENT_SCHEMA_VERSION = 1;
+
+export const SUPPORTED_SCHEMA_VERSIONS = [CURRENT_SCHEMA_VERSION] as const;
+
+export type SchemaVersion = (typeof SUPPORTED_SCHEMA_VERSIONS)[number];
+
+export type VersionedDefinition = JsonObject & {
+  readonly schemaVersion: SchemaVersion;
+};
+
+export type SchemaVersionFailureCode =
+  | "schema_version_missing"
+  | "schema_version_unsupported";
+
+export type SchemaVersionFailure = {
+  readonly code: SchemaVersionFailureCode;
+  readonly message: string;
+  readonly path: string;
+  readonly severity: "error";
+  readonly supportedVersions: readonly SchemaVersion[];
+};
+
 export class JsonValueError extends TypeError {
   constructor(path: string, reason: string) {
     super(`${path}: ${reason}`);
@@ -15,8 +37,32 @@ export class JsonValueError extends TypeError {
   }
 }
 
+export class SchemaVersionError extends TypeError {
+  readonly failure: SchemaVersionFailure;
+
+  constructor(failure: SchemaVersionFailure) {
+    super(`${failure.path}: ${failure.message}`);
+    this.name = "SchemaVersionError";
+    this.failure = failure;
+  }
+}
+
 export function isJsonValue(value: unknown): value is JsonValue {
   return findJsonValueError(value) === undefined;
+}
+
+export function isSchemaVersion(value: unknown): value is SchemaVersion {
+  return value === CURRENT_SCHEMA_VERSION;
+}
+
+export function isVersionedDefinition(
+  value: unknown,
+): value is VersionedDefinition {
+  return (
+    findSchemaVersionFailure(value) === undefined &&
+    isJsonRecord(value) &&
+    isJsonValue(value)
+  );
 }
 
 export function assertJsonValue(
@@ -30,11 +76,62 @@ export function assertJsonValue(
   }
 }
 
+export function assertSchemaVersion(
+  value: unknown,
+  path = "$.schemaVersion",
+): asserts value is SchemaVersion {
+  const failure = findSchemaVersionValueFailure(value, path);
+
+  if (failure !== undefined) {
+    throw new SchemaVersionError(failure);
+  }
+}
+
+export function assertVersionedDefinition(
+  value: unknown,
+  path = "$",
+): asserts value is VersionedDefinition {
+  const failure = findSchemaVersionFailure(value, path);
+
+  if (failure !== undefined) {
+    throw new SchemaVersionError(failure);
+  }
+
+  assertJsonValue(value, path);
+}
+
 export function findJsonValueError(
   value: unknown,
   path = "$",
 ): { path: string; reason: string } | undefined {
   return findJsonValueErrorInternal(value, path, new Set());
+}
+
+export function findSchemaVersionFailure(
+  value: unknown,
+  path = "$",
+): SchemaVersionFailure | undefined {
+  if (!isJsonRecord(value) || !Object.hasOwn(value, "schemaVersion")) {
+    return createSchemaVersionFailure("schema_version_missing", {
+      path: appendPathSegment(path, "schemaVersion"),
+    });
+  }
+
+  return findSchemaVersionValueFailure(
+    value.schemaVersion,
+    appendPathSegment(path, "schemaVersion"),
+  );
+}
+
+export function findSchemaVersionValueFailure(
+  value: unknown,
+  path = "$.schemaVersion",
+): SchemaVersionFailure | undefined {
+  if (isSchemaVersion(value)) {
+    return undefined;
+  }
+
+  return createSchemaVersionFailure("schema_version_unsupported", { path });
 }
 
 function findJsonValueErrorInternal(
@@ -65,6 +162,40 @@ function findJsonValueErrorInternal(
     case "undefined":
       return { path, reason: `${typeof value} is not JSON-compatible` };
   }
+}
+
+function createSchemaVersionFailure(
+  code: SchemaVersionFailureCode,
+  options: { readonly path: string },
+): SchemaVersionFailure {
+  return {
+    code,
+    message:
+      code === "schema_version_missing"
+        ? `schemaVersion is required and must be ${CURRENT_SCHEMA_VERSION}`
+        : `schemaVersion must be ${CURRENT_SCHEMA_VERSION}`,
+    path: options.path,
+    severity: "error",
+    supportedVersions: SUPPORTED_SCHEMA_VERSIONS,
+  };
+}
+
+function appendPathSegment(path: string, segment: string) {
+  return path === "$" ? `$.${segment}` : `${path}.${segment}`;
+}
+
+function isJsonRecord(value: unknown): value is Record<string, unknown> {
+  const prototype =
+    typeof value === "object" && value !== null
+      ? Object.getPrototypeOf(value)
+      : undefined;
+
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    (prototype === null || prototype === Object.prototype)
+  );
 }
 
 function findJsonObjectError(
