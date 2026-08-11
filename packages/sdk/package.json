@@ -1,6 +1,6 @@
 {
   "name": "constructa-sdk",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "The supported developer-facing API for Constructa.",
   "private": false,
   "license": "MIT",
