@@ -1,5 +1,11 @@
 # constructa-schema
 
+## 0.0.2
+
+### Patch Changes
+
+- ae0cf8e: Add the initial schema version marker contract and structured validation failures.
+
 ## 0.0.1
 
 ### Patch Changes
