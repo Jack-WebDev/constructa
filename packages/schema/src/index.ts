@@ -18,6 +18,22 @@ export type VersionedDefinition = JsonObject & {
   readonly schemaVersion: SchemaVersion;
 };
 
+export type DefinitionEnvelope = {
+  readonly schemaVersion: SchemaVersion;
+  readonly type: string;
+  readonly configuration: JsonObject;
+  readonly name?: string;
+  readonly description?: string;
+};
+
+export const DEFINITION_ENVELOPE_TOP_LEVEL_KEYS = [
+  "schemaVersion",
+  "type",
+  "configuration",
+  "name",
+  "description",
+] as const;
+
 export type SchemaVersionFailureCode =
   | "schema_version_missing"
   | "schema_version_unsupported";
@@ -29,6 +45,44 @@ export type SchemaVersionFailure = {
   readonly severity: "error";
   readonly supportedVersions: readonly SchemaVersion[];
 };
+
+export type DefinitionEnvelopeFailureCode =
+  | SchemaVersionFailureCode
+  | "definition_envelope_not_json"
+  | "definition_envelope_not_object"
+  | "generator_type_missing"
+  | "generator_type_invalid"
+  | "configuration_missing"
+  | "configuration_invalid"
+  | "name_invalid"
+  | "description_invalid"
+  | "top_level_property_unknown";
+
+export type DefinitionEnvelopeShapeFailureCode = Exclude<
+  DefinitionEnvelopeFailureCode,
+  SchemaVersionFailureCode
+>;
+
+export type DefinitionEnvelopeShapeFailure = {
+  readonly code: DefinitionEnvelopeShapeFailureCode;
+  readonly message: string;
+  readonly path: string;
+  readonly severity: "error";
+};
+
+export type DefinitionEnvelopeFailure =
+  | SchemaVersionFailure
+  | DefinitionEnvelopeShapeFailure;
+
+export type DefinitionEnvelopeParseResult =
+  | {
+      readonly success: true;
+      readonly value: DefinitionEnvelope;
+    }
+  | {
+      readonly success: false;
+      readonly failure: DefinitionEnvelopeFailure;
+    };
 
 export class JsonValueError extends TypeError {
   constructor(path: string, reason: string) {
@@ -43,6 +97,16 @@ export class SchemaVersionError extends TypeError {
   constructor(failure: SchemaVersionFailure) {
     super(`${failure.path}: ${failure.message}`);
     this.name = "SchemaVersionError";
+    this.failure = failure;
+  }
+}
+
+export class DefinitionEnvelopeError extends TypeError {
+  readonly failure: DefinitionEnvelopeFailure;
+
+  constructor(failure: DefinitionEnvelopeFailure) {
+    super(`${failure.path}: ${failure.message}`);
+    this.name = "DefinitionEnvelopeError";
     this.failure = failure;
   }
 }
@@ -63,6 +127,12 @@ export function isVersionedDefinition(
     isJsonRecord(value) &&
     isJsonValue(value)
   );
+}
+
+export function isDefinitionEnvelope(
+  value: unknown,
+): value is DefinitionEnvelope {
+  return findDefinitionEnvelopeFailure(value) === undefined;
 }
 
 export function assertJsonValue(
@@ -100,11 +170,124 @@ export function assertVersionedDefinition(
   assertJsonValue(value, path);
 }
 
+export function assertDefinitionEnvelope(
+  value: unknown,
+  path = "$",
+): asserts value is DefinitionEnvelope {
+  const failure = findDefinitionEnvelopeFailure(value, path);
+
+  if (failure !== undefined) {
+    throw new DefinitionEnvelopeError(failure);
+  }
+}
+
+export function parseDefinitionEnvelope(
+  value: unknown,
+  path = "$",
+): DefinitionEnvelope {
+  assertDefinitionEnvelope(value, path);
+  return value;
+}
+
+export function safeParseDefinitionEnvelope(
+  value: unknown,
+  path = "$",
+): DefinitionEnvelopeParseResult {
+  const failure = findDefinitionEnvelopeFailure(value, path);
+
+  if (failure !== undefined) {
+    return { failure, success: false };
+  }
+
+  return { success: true, value: value as DefinitionEnvelope };
+}
+
 export function findJsonValueError(
   value: unknown,
   path = "$",
 ): { path: string; reason: string } | undefined {
   return findJsonValueErrorInternal(value, path, new Set());
+}
+
+export function findDefinitionEnvelopeFailure(
+  value: unknown,
+  path = "$",
+): DefinitionEnvelopeFailure | undefined {
+  const jsonError = findJsonValueError(value, path);
+
+  if (jsonError !== undefined) {
+    return createDefinitionEnvelopeFailure("definition_envelope_not_json", {
+      message: jsonError.reason,
+      path: jsonError.path,
+    });
+  }
+
+  if (!isJsonRecord(value)) {
+    return createDefinitionEnvelopeFailure("definition_envelope_not_object", {
+      path,
+    });
+  }
+
+  const versionFailure = findSchemaVersionFailure(value, path);
+
+  if (versionFailure !== undefined) {
+    return versionFailure;
+  }
+
+  if (!Object.hasOwn(value, "type")) {
+    return createDefinitionEnvelopeFailure("generator_type_missing", {
+      path: appendPathSegment(path, "type"),
+    });
+  }
+
+  const typeValue = value.type;
+
+  if (typeof typeValue !== "string" || typeValue.trim().length === 0) {
+    return createDefinitionEnvelopeFailure("generator_type_invalid", {
+      path: appendPathSegment(path, "type"),
+    });
+  }
+
+  if (!Object.hasOwn(value, "configuration")) {
+    return createDefinitionEnvelopeFailure("configuration_missing", {
+      path: appendPathSegment(path, "configuration"),
+    });
+  }
+
+  if (!isJsonRecord(value.configuration)) {
+    return createDefinitionEnvelopeFailure("configuration_invalid", {
+      path: appendPathSegment(path, "configuration"),
+    });
+  }
+
+  for (const optionalStringField of ["name", "description"] as const) {
+    const fieldFailure = findDefinitionEnvelopeStringFieldFailure(value, {
+      invalidCode:
+        optionalStringField === "name" ? "name_invalid" : "description_invalid",
+      path: appendPathSegment(path, optionalStringField),
+      property: optionalStringField,
+    });
+
+    if (fieldFailure !== undefined) {
+      return fieldFailure;
+    }
+  }
+
+  const unknownKey = Object.keys(value).find(
+    (key) =>
+      !DEFINITION_ENVELOPE_TOP_LEVEL_KEYS.includes(
+        key as (typeof DEFINITION_ENVELOPE_TOP_LEVEL_KEYS)[number],
+      ),
+  );
+
+  if (unknownKey !== undefined) {
+    return createDefinitionEnvelopeFailure("top_level_property_unknown", {
+      message: `Unknown top-level property: ${unknownKey}`,
+      path: appendPathSegment(path, unknownKey),
+    });
+  }
+
+  return undefined;
 }
 
 export function findSchemaVersionFailure(
@@ -178,6 +361,62 @@ function createSchemaVersionFailure(
     severity: "error",
     supportedVersions: SUPPORTED_SCHEMA_VERSIONS,
   };
+}
+
+function createDefinitionEnvelopeFailure(
+  code: DefinitionEnvelopeShapeFailureCode,
+  options: { readonly message?: string; readonly path: string },
+): DefinitionEnvelopeShapeFailure {
+  return {
+    code,
+    message: options.message ?? getDefinitionEnvelopeFailureMessage(code),
+    path: options.path,
+    severity: "error",
+  };
+}
+
+function getDefinitionEnvelopeFailureMessage(
+  code: DefinitionEnvelopeShapeFailureCode,
+) {
+  switch (code) {
+    case "definition_envelope_not_json":
+      return "definition envelope must be portable JSON data";
+    case "definition_envelope_not_object":
+      return "definition envelope must be a JSON object";
+    case "generator_type_missing":
+      return "type is required";
+    case "generator_type_invalid":
+      return "type must be a non-empty string";
+    case "configuration_missing":
+      return "configuration is required";
+    case "configuration_invalid":
+      return "configuration must be a JSON object";
+    case "name_invalid":
+      return "name must be a string when present";
+    case "description_invalid":
+      return "description must be a string when present";
+    case "top_level_property_unknown":
+      return "unknown top-level properties are not allowed";
+  }
+}
+
+function findDefinitionEnvelopeStringFieldFailure(
+  value: Record<string, unknown>,
+  options: {
+    readonly invalidCode: DefinitionEnvelopeShapeFailureCode;
+    readonly path: string;
+    readonly property: string;
+  },
+): DefinitionEnvelopeShapeFailure | undefined {
+  if (!Object.hasOwn(value, options.property)) {
+    return undefined;
+  }
+
+  return typeof value[options.property] === "string"
+    ? undefined
+    : createDefinitionEnvelopeFailure(options.invalidCode, {
+        path: options.path,
+      });
 }
 
 function appendPathSegment(path: string, segment: string) {

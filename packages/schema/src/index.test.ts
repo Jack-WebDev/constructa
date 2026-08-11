@@ -1,21 +1,30 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertDefinitionEnvelope,
   assertJsonValue,
   assertSchemaVersion,
   assertVersionedDefinition,
   CURRENT_SCHEMA_VERSION,
+  DEFINITION_ENVELOPE_TOP_LEVEL_KEYS,
+  type DefinitionEnvelope,
+  DefinitionEnvelopeError,
+  type DefinitionEnvelopeFailure,
+  findDefinitionEnvelopeFailure,
   findJsonValueError,
   findSchemaVersionFailure,
   findSchemaVersionValueFailure,
+  isDefinitionEnvelope,
   isJsonValue,
   isSchemaVersion,
   isVersionedDefinition,
   type JsonValue,
   JsonValueError,
+  parseDefinitionEnvelope,
   type SchemaVersion,
   SchemaVersionError,
   SUPPORTED_SCHEMA_VERSIONS,
+  safeParseDefinitionEnvelope,
   type VersionedDefinition,
 } from "./index";
 
@@ -36,6 +45,32 @@ const validDefinitions: readonly JsonValue[] = [
       nested: [{ enabled: true }, { label: "portable" }],
     },
     type: "integer",
+  },
+];
+
+const definitionEnvelopeFixtures: readonly DefinitionEnvelope[] = [
+  {
+    configuration: {
+      max: 100,
+      min: 1,
+    },
+    description: "An integer in a bounded range.",
+    name: "Small integer",
+    schemaVersion: CURRENT_SCHEMA_VERSION,
+    type: "integer",
+  },
+  {
+    configuration: {},
+    schemaVersion: 1,
+    type: "boolean",
+  },
+  {
+    configuration: {
+      values: ["Admin", "Member", "Viewer"],
+    },
+    name: "",
+    schemaVersion: 1,
+    type: "choice",
   },
 ];
 
@@ -242,6 +277,238 @@ describe("schema version marker", () => {
         expect.objectContaining({
           code: "schema_version_unsupported",
           path: "$.schemaVersion",
+        }),
+      );
+    }
+  });
+});
+
+describe("definition envelope", () => {
+  it("exports the canonical top-level envelope keys", () => {
+    expect(DEFINITION_ENVELOPE_TOP_LEVEL_KEYS).toEqual([
+      "schemaVersion",
+      "type",
+      "configuration",
+      "name",
+      "description",
+    ]);
+  });
+
+  it.each(definitionEnvelopeFixtures)(
+    "parses portable generator definition envelopes",
+    (definition) => {
+      expect(isDefinitionEnvelope(definition)).toBe(true);
+      expect(findDefinitionEnvelopeFailure(definition)).toBeUndefined();
+      expect(() => assertDefinitionEnvelope(definition)).not.toThrow();
+      expect(parseDefinitionEnvelope(definition)).toBe(definition);
+      expect(safeParseDefinitionEnvelope(definition)).toEqual({
+        success: true,
+        value: definition,
+      });
+
+      const encoded = JSON.stringify(definition);
+      const decoded = JSON.parse(encoded);
+
+      expect(decoded).toEqual(definition);
+      expect(isDefinitionEnvelope(decoded)).toBe(true);
+    },
+  );
+
+  it("narrows parsed values to the inferred TypeScript envelope type", () => {
+    const parsed: DefinitionEnvelope = parseDefinitionEnvelope({
+      configuration: {},
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      type: "integer",
+    });
+
+    expect(parsed.configuration).toEqual({});
+    expect(parsed.schemaVersion).toBe(1);
+    expect(parsed.type).toBe("integer");
+  });
+
+  it("allows generator-specific data only inside configuration", () => {
+    const definition = {
+      configuration: {
+        nested: {
+          custom: [1, "two", true, null],
+        },
+      },
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      type: "custom",
+    };
+
+    expect(isDefinitionEnvelope(definition)).toBe(true);
+  });
+
+  it.each([
+    [
+      "top-level array",
+      [],
+      {
+        code: "definition_envelope_not_object",
+        message: "definition envelope must be a JSON object",
+        path: "$",
+      },
+    ],
+    [
+      "non-portable nested value",
+      {
+        configuration: {
+          min: Number.NaN,
+        },
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        type: "integer",
+      },
+      {
+        code: "definition_envelope_not_json",
+        message: "number must be finite",
+        path: "$.configuration.min",
+      },
+    ],
+    [
+      "missing type",
+      {
+        configuration: {},
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+      },
+      {
+        code: "generator_type_missing",
+        message: "type is required",
+        path: "$.type",
+      },
+    ],
+    [
+      "blank type",
+      {
+        configuration: {},
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        type: "   ",
+      },
+      {
+        code: "generator_type_invalid",
+        message: "type must be a non-empty string",
+        path: "$.type",
+      },
+    ],
+    [
+      "missing configuration",
+      {
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        type: "integer",
+      },
+      {
+        code: "configuration_missing",
+        message: "configuration is required",
+        path: "$.configuration",
+      },
+    ],
+    [
+      "array configuration",
+      {
+        configuration: [],
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        type: "integer",
+      },
+      {
+        code: "configuration_invalid",
+        message: "configuration must be a JSON object",
+        path: "$.configuration",
+      },
+    ],
+    [
+      "invalid name",
+      {
+        configuration: {},
+        name: null,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        type: "integer",
+      },
+      {
+        code: "name_invalid",
+        message: "name must be a string when present",
+        path: "$.name",
+      },
+    ],
+    [
+      "invalid description",
+      {
+        configuration: {},
+        description: false,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        type: "integer",
+      },
+      {
+        code: "description_invalid",
+        message: "description must be a string when present",
+        path: "$.description",
+      },
+    ],
+    [
+      "unknown top-level property",
+      {
+        configuration: {},
+        metadata: {},
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        type: "integer",
+      },
+      {
+        code: "top_level_property_unknown",
+        message: "Unknown top-level property: metadata",
+        path: "$.metadata",
+      },
+    ],
+  ] as const)(
+    "returns a structured definition envelope failure for %s",
+    (_name, definition, expectedFailure) => {
+      const failure: DefinitionEnvelopeFailure = {
+        ...expectedFailure,
+        severity: "error",
+      };
+
+      expect(findDefinitionEnvelopeFailure(definition)).toEqual(failure);
+      expect(isDefinitionEnvelope(definition)).toBe(false);
+      expect(safeParseDefinitionEnvelope(definition)).toEqual({
+        failure,
+        success: false,
+      });
+      expect(() => assertDefinitionEnvelope(definition)).toThrow(
+        DefinitionEnvelopeError,
+      );
+    },
+  );
+
+  it("reuses schema version failures for invalid envelope versions", () => {
+    const definition = {
+      configuration: {},
+      schemaVersion: 2,
+      type: "integer",
+    };
+
+    expect(findDefinitionEnvelopeFailure(definition)).toEqual({
+      code: "schema_version_unsupported",
+      message: "schemaVersion must be 1",
+      path: "$.schemaVersion",
+      severity: "error",
+      supportedVersions: [1],
+    });
+  });
+
+  it("exposes the structured failure when definition envelope assertion throws", () => {
+    expect.assertions(2);
+
+    try {
+      assertDefinitionEnvelope({
+        configuration: {},
+        extra: true,
+        schemaVersion: CURRENT_SCHEMA_VERSION,
+        type: "integer",
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(DefinitionEnvelopeError);
+      expect((error as DefinitionEnvelopeError).failure).toEqual(
+        expect.objectContaining({
+          code: "top_level_property_unknown",
+          path: "$.extra",
         }),
       );
     }
