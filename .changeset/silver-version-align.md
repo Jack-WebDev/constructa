@@ -1,4 +1,5 @@
 ---
+"constructa-schema": patch
 ---
 
-Align all publishable packages to version 0.0.4.
+Add the portable definition envelope type, validation helpers, fixtures, and documented unknown top-level property policy.

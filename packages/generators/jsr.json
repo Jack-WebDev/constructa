@@ -1,6 +1,6 @@
 {
   "name": "@constructa/generators",
-  "version": "0.0.4",
+  "version": "0.0.3",
   "exports": {
     ".": "./src/index.ts"
   },
