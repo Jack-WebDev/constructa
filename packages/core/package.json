@@ -1,8 +1,8 @@
 {
   "name": "@constructa/core",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "The UI-agnostic Constructa generator execution engine.",
-  "private": true,
+  "private": false,
   "license": "MIT",
   "type": "module",
   "files": [
