@@ -1,0 +1,78 @@
+name: Feature
+description: Track a scoped feature implementation for Constructa
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for planned, implementation-ready feature work.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for related work.
+          required: true
+        - label: This feature has a clear user or platform outcome.
+          required: true
+        - label: This issue is scoped narrowly enough for one focused PR.
+          required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the feature and why it should exist.
+      placeholder: Add the initial schema version marker to portable definitions.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: List the concrete implementation work included in this issue.
+      placeholder: |
+        - Export schema version constants and types.
+        - Add structured failures for missing or unsupported versions.
+        - Cover the behavior with tests.
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Call out related work that should not be included in this issue.
+      placeholder: Migration between schema versions.
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance criteria
+      description: Define the observable conditions that make this issue complete.
+      placeholder: |
+        - Complete definitions declare schemaVersion 1.
+        - Missing schemaVersion produces a structured failure.
+        - Unknown schema versions produce a structured failure.
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      description: List automated checks or manual testing expected for the PR.
+      placeholder: |
+        - pnpm run check
+        - pnpm run test
+        - pnpm --filter constructa-schema build
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Link related roadmap phases, design notes, issues, or discussions.
