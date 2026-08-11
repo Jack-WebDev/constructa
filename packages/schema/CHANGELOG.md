@@ -1,11 +1,5 @@
 # constructa-schema
 
-## 0.0.4
-
-### Patch Changes
-
-- Add the portable definition envelope type, validation helpers, fixtures, and documented unknown top-level property policy.
-
 ## 0.0.3
 
 ### Patch Changes
