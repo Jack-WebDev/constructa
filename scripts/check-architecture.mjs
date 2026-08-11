@@ -7,22 +7,22 @@ import ts from "typescript";
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const runtimeDependencyPolicy = Object.freeze({
-  "@constructa/api": ["@constructa/env", "@constructa/sdk"],
-  "@constructa/cli": ["@constructa/env", "@constructa/sdk"],
+  "@constructa/api": ["@constructa/env", "constructa-sdk"],
+  "@constructa/cli": ["@constructa/env", "constructa-sdk"],
   "@constructa/config": [],
-  "@constructa/core": ["@constructa/schema"],
+  "constructa-core": ["constructa-schema"],
   "@constructa/env": [],
-  "@constructa/exporters": [],
-  "@constructa/generators": ["@constructa/core", "@constructa/schema"],
-  "@constructa/schema": [],
-  "@constructa/sdk": [
-    "@constructa/core",
-    "@constructa/exporters",
-    "@constructa/generators",
-    "@constructa/schema",
+  "constructa-exporters": [],
+  "constructa-generators": ["constructa-core", "constructa-schema"],
+  "constructa-schema": [],
+  "constructa-sdk": [
+    "constructa-core",
+    "constructa-exporters",
+    "constructa-generators",
+    "constructa-schema",
   ],
   "@constructa/ui": [],
-  web: ["@constructa/env", "@constructa/sdk", "@constructa/ui"],
+  web: ["@constructa/env", "constructa-sdk", "@constructa/ui"],
 });
 
 const developmentOnlyDependencies = new Set(["@constructa/config"]);

@@ -32,15 +32,15 @@ async function createFixture({
   await createPackage(
     rootDirectory,
     "packages/schema",
-    { name: "@constructa/schema", ...schemaManifest },
+    { name: "constructa-schema", ...schemaManifest },
     "export {};",
   );
   await createPackage(
     rootDirectory,
     "packages/core",
     {
-      name: "@constructa/core",
-      dependencies: { "@constructa/schema": "workspace:*" },
+      name: "constructa-core",
+      dependencies: { "constructa-schema": "workspace:*" },
     },
     coreSource,
   );
@@ -58,7 +58,7 @@ afterEach(async () => {
 describe("architecture boundary check", () => {
   it("accepts imports in the documented dependency direction", async () => {
     const rootDirectory = await createFixture({
-      coreSource: 'export type {} from "@constructa/schema";',
+      coreSource: 'export type {} from "constructa-schema";',
     });
 
     await expect(checkArchitecture(rootDirectory)).resolves.toEqual([]);
@@ -67,12 +67,12 @@ describe("architecture boundary check", () => {
   it("rejects a deliberately forbidden dependency and import", async () => {
     const rootDirectory = await createFixture({
       schemaManifest: {
-        dependencies: { "@constructa/core": "workspace:*" },
+        dependencies: { "constructa-core": "workspace:*" },
       },
     });
     await writeFile(
       join(rootDirectory, "packages/schema/src/index.ts"),
-      'import "@constructa/core";',
+      'import "constructa-core";',
     );
 
     const errors = await checkArchitecture(rootDirectory);
@@ -80,10 +80,10 @@ describe("architecture boundary check", () => {
     expect(errors).toEqual(
       expect.arrayContaining([
         expect.stringContaining(
-          "@constructa/schema may not list @constructa/core in dependencies",
+          "constructa-schema may not list constructa-core in dependencies",
         ),
         expect.stringContaining(
-          "@constructa/schema may not import @constructa/core",
+          "constructa-schema may not import constructa-core",
         ),
       ]),
     );
@@ -103,11 +103,11 @@ describe("architecture boundary check", () => {
     const rootDirectory = await createFixture({});
     await writeFile(
       join(rootDirectory, "apps/web/src/index.ts"),
-      'type Core = import("@constructa/core").Core;',
+      'type Core = import("constructa-core").Core;',
     );
 
     await expect(checkArchitecture(rootDirectory)).resolves.toEqual([
-      expect.stringContaining("web may not import @constructa/core"),
+      expect.stringContaining("web may not import constructa-core"),
     ]);
   });
 });

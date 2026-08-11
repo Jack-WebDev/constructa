@@ -6,4 +6,4 @@ The first implementation set will include integer, boolean, choice, decimal, str
 
 ## Dependency boundary
 
-This package may import `@constructa/core` for the generator contract and registration APIs, and `@constructa/schema` for portable definitions. It must not import exporters, the SDK, applications, UI, environment, persistence, or transport code.
+This package may import `constructa-core` for the generator contract and registration APIs, and `constructa-schema` for portable definitions. It must not import exporters, the SDK, applications, UI, environment, persistence, or transport code.

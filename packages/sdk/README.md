@@ -6,4 +6,4 @@ The SDK will assemble the core engine, built-in generators, and exporters behind
 
 ## Dependency boundary
 
-The SDK may import `@constructa/schema`, `@constructa/core`, `@constructa/generators`, and `@constructa/exporters`. It must remain independent of applications, UI, environment, persistence, and transport code so every delivery surface receives the same behavior.
+The SDK may import `constructa-schema`, `constructa-core`, `constructa-generators`, and `constructa-exporters`. It must remain independent of applications, UI, environment, persistence, and transport code so every delivery surface receives the same behavior.

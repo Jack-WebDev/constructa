@@ -26,17 +26,17 @@ The enforceable workspace dependency policy is:
 
 | Workspace | Allowed Constructa runtime dependencies |
 | --- | --- |
-| `@constructa/schema` | None |
-| `@constructa/core` | `@constructa/schema` |
-| `@constructa/generators` | `@constructa/core`, `@constructa/schema` |
-| `@constructa/exporters` | None |
-| `@constructa/sdk` | `@constructa/core`, `@constructa/generators`, `@constructa/exporters`, `@constructa/schema` |
+| `constructa-schema` | None |
+| `constructa-core` | `constructa-schema` |
+| `constructa-generators` | `constructa-core`, `constructa-schema` |
+| `constructa-exporters` | None |
+| `constructa-sdk` | `constructa-core`, `constructa-generators`, `constructa-exporters`, `constructa-schema` |
 | `@constructa/ui` | None |
 | `@constructa/env` | None |
 | `@constructa/config` | None |
-| `apps/web` | `@constructa/sdk`, `@constructa/ui`, `@constructa/env` |
-| `apps/api` | `@constructa/sdk`, `@constructa/env` |
-| `apps/cli` | `@constructa/sdk`, `@constructa/env` |
+| `apps/web` | `constructa-sdk`, `@constructa/ui`, `@constructa/env` |
+| `apps/api` | `constructa-sdk`, `@constructa/env` |
+| `apps/cli` | `constructa-sdk`, `@constructa/env` |
 
 An allowed dependency is optional until a workspace needs it. Internal imports must use the dependency's package name and public exports; relative imports into another workspace are forbidden. Every imported workspace package must be declared in the importing package's manifest. `@constructa/config` is a development-only exception available to every workspace for shared tooling, and does not form part of the runtime graph. Third-party dependencies are governed by the ownership rules below rather than this internal graph.
 
