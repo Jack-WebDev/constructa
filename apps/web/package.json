@@ -38,6 +38,6 @@
     "jsdom": "catalog:",
     "typescript": "catalog:",
     "vite": "^8.1.5",
-    "web-vitals": "^6.0.1"
+    "web-vitals": "^6.1.1"
   }
 }
