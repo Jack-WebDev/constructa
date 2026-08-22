@@ -1,243 +1,480 @@
-# Constructa
+<div align="center">
 
-Constructa is an open-source, extensible platform for building reusable data generators from small, composable building blocks.
+# CONSTRUCTA
 
-Instead of offering a collection of unrelated tools for generating numbers, dates, UUIDs, names, or passwords, Constructa treats **generation as a common abstraction**. A simple generator can produce one value, while multiple generators can be combined to produce complete objects, lists, templates, and synthetic datasets.
+### *Build the generator you need.*
 
-The goal is to make simple generation tasks immediate while allowing more advanced generators to be built without writing code.
+<p>
+  <img src="https://img.shields.io/badge/status-early--development-EF4444?style=for-the-badge&labelColor=1a1a2e" alt="Status" />
+  <img src="https://img.shields.io/badge/license-MIT-F59E0B?style=for-the-badge&labelColor=1a1a2e" alt="License" />
+  <img src="https://img.shields.io/badge/node-22%2B-22C55E?style=for-the-badge&logo=node.js&logoColor=white&labelColor=1a1a2e" alt="Node" />
+  <img src="https://img.shields.io/badge/pnpm-10.32.1-6366F1?style=for-the-badge&logo=pnpm&logoColor=white&labelColor=1a1a2e" alt="pnpm" />
+</p>
 
-> Use the generators Constructa provides to build the generator you need.
+**Constructa is a toolkit for creating reusable data generators from small, composable building blocks.**
 
-## The core idea
+<sub>Generate a number. Generate a UUID. Pick from a list. Or combine them into anything you need.</sub>
 
-Every generator accepts a portable configuration and produces an output. For example:
+<br>
 
-```json
-{
-  "type": "integer",
-  "min": 18,
-  "max": 65
-}
+[**⚡ Why Constructa**](#-why-constructa) •
+[**🧩 What Can You Build**](#-what-can-you-build) •
+[**📦 Install**](#-install) •
+[**🛠️ Built-in Generators**](#️-built-in-generators) •
+[**🗺️ Roadmap**](#️-where-is-constructa-going) •
+[**🤝 Contributing**](#-contributing)
+
+</div>
+
+<br>
+
+```text
+User
+├── id          → UUID
+├── age         → Integer(18, 65)
+├── role        → Choice(admin, member, viewer)
+└── active      → Boolean
 ```
 
-Primitive generators can then be composed into structured generators:
-
-```json
-{
-  "type": "object",
-  "fields": {
-    "id": {
-      "type": "uuid"
-    },
-    "age": {
-      "type": "integer",
-      "min": 18,
-      "max": 65
-    },
-    "department": {
-      "type": "choice",
-      "values": ["Engineering", "Finance", "Sales"]
-    },
-    "active": {
-      "type": "boolean"
-    }
-  }
-}
-```
-
-That definition could produce:
+**into:**
 
 ```json
 {
   "id": "289b71e6-...",
   "age": 32,
-  "department": "Engineering",
+  "role": "member",
   "active": true
 }
 ```
 
-Generator definitions are represented as data so that the same definition can eventually be saved, shared, versioned, exported, and executed through every Constructa interface.
+The same idea scales from generating **one value** to generating **entire datasets**.
 
-## Who it is for
+> [!TIP]
+> Instead of searching for a generator that already exists, compose the one you need.
 
-Constructa is intended for:
+<br>
 
-- Developers creating fixtures, seed data, mock API responses, and sample datasets
-- QA engineers generating test records, boundary cases, and predefined input combinations
-- Casual users who need quick values such as numbers, dates, colors, choices, or passwords
-- Writers and educators creating prompts, characters, exercises, groups, and example data
+## ⚡ Why Constructa?
 
-## Product experience
-
-Constructa will provide two primary ways to work:
-
-### Quick Generate
-
-Choose a built-in generator, configure it, and get a result immediately. Users should not need to understand composition to generate a simple value.
-
-### Visual Generator Builder
-
-Build custom generators by adding fields, selecting generator types, configuring them, and nesting generators. The builder will provide validation and live result previews without requiring users to write code.
-
-## MVP
-
-The MVP is focused on answering one question:
-
-> Can users build useful generators by combining smaller generators?
-
-The initial generator library is expected to include:
-
-- Primitive generators: Integer, Decimal, Boolean, Choice, String, Date, and UUID
-- Composite generators: Object, Array, and Template
-
-The first important milestone is an engine that can execute a nested object definition without the object generator needing to know how its child generators work. A web playground and visual builder will then expose that engine to users.
-
-Authentication, persistence, sharing, and large generator libraries are intentionally secondary to proving the composition model.
-
-## Design principles
-
-- **Everything is a generator.** Primitive values and complex records use the same conceptual model.
-- **Small generators compose.** Basic generators should act as reusable building blocks.
-- **Simple things stay simple.** Advanced capabilities should not add friction to quick generation.
-- **Configuration is data.** Definitions should be serializable and portable rather than tied to UI state.
-- **The engine is UI-agnostic.** Core generation behavior must not depend on React, routes, forms, or other web concerns.
-- **Registration over branching.** New generator types should be addable without rewriting the execution engine.
-- **Definitions are safe by default.** The platform will not execute arbitrary user-provided JavaScript.
-
-## Long-term vision
-
-Constructa is intended to grow into a general-purpose generation engine with several connected interfaces:
+Most generator tools are collections of predefined utilities:
 
 ```text
-                         Generator Core
-                               │
-             ┌─────────────────┼─────────────────┐
-             │                 │                 │
-             ▼                 ▼                 ▼
-         Web Builder        Library             API
-                                                   │
-                                      ┌────────────┴────────────┐
-                                      ▼                         ▼
-                                     CLI                   Integrations
+Random Number Generator
+Random Date Generator
+Random UUID Generator
+Random Name Generator
+...
 ```
 
-A generator created visually in the web application should eventually be executable through the JavaScript library, public API, or CLI without changing its definition.
+That works until you need something specific.
 
-Long-term capabilities include:
+Suppose you need test customers shaped like this:
 
-- Saving, editing, duplicating, and versioning generators
-- Sharing private, unlisted, and public generators
-- Bulk generation and JSON, CSV, JSON Lines, SQL, and other export formats
-- Seeded randomness for deterministic fixtures and reproducible datasets
-- References between generated fields, templates, and limited conditional generation
-- Prebuilt templates for customers, products, employees, orders, and other common datasets
-- A supported SDK, public API, and command-line interface
-- Community templates, integrations, and a carefully sandboxed plugin ecosystem
+```json
+{
+  "id": "usr_...",
+  "age": 27,
+  "plan": "pro",
+  "active": true
+}
+```
 
-The long-term product succeeds when users stop searching for a website with a specific generator and instead use Constructa to build exactly what they need.
+With Constructa, **each field is simply another generator**:
 
-## Architecture direction
+```json
+{
+  "type": "object",
+  "fields": {
+    "id": { "type": "uuid" },
+    "age": { "type": "integer", "min": 18, "max": 65 },
+    "plan": { "type": "choice", "values": ["free", "pro", "enterprise"] },
+    "active": { "type": "boolean" }
+  }
+}
+```
 
-The generation system is planned as independent layers:
+Constructa executes the definition and gives you the result.
+
+| ❌ Without Constructa | ✅ With Constructa |
+| --- | --- |
+| A special-purpose `customerGenerator` | Generators composed from generators |
+| A giant collection of unrelated tools | One small, reusable set of building blocks |
+
+<br>
+
+## 🧩 What can you build?
+
+Anything that can be described using Constructa's building blocks.
 
 ```text
-Web application / CLI / API
-            │
-            ▼
-      Developer SDK
-            │
-            ▼
-      Generator Core
-  registry, validation,
- execution, context, errors
-            │
-            ▼
-    Generator Modules
+Primitive                     Composite
+
+Integer ───────┐
+Decimal ───────┤
+Boolean ───────┤
+Choice ────────┼──────▶ Object
+String ────────┤        Array
+Date ──────────┤        Template
+UUID ──────────┘
 ```
 
-The project uses a TypeScript monorepo so the schema, engine, generators, and user interfaces can evolve independently while sharing types and behavior.
+That can become:
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for package responsibilities and dependency rules.
+<table>
+<tr>
+<td>🧑‍💻 Test users</td>
+<td>🗄️ Database fixtures</td>
+<td>📡 Mock API responses</td>
+</tr>
+<tr>
+<td>🛒 Product catalogs</td>
+<td>🌱 Seed data</td>
+<td>🧪 QA datasets</td>
+</tr>
+<tr>
+<td>👥 Random teams</td>
+<td>🎮 Character generators</td>
+<td>❓ Quiz data</td>
+</tr>
+<tr>
+<td colspan="3">🧠 Custom domain-specific generators</td>
+</tr>
+</table>
 
-## Project status
+Because generator definitions are plain data, they can eventually be saved, shared, versioned, exported, and executed anywhere Constructa runs.
 
-Constructa is in early development. The repository currently contains the application scaffolding; the generator engine and builder described above are being developed incrementally.
+<br>
 
-## Contributing
+## 🔍 Quick example
 
-Constructa welcomes bug reports, feature proposals, documentation improvements, and code contributions. Read [CONTRIBUTING.md](CONTRIBUTING.md) before starting substantial work.
+**A simple generator:**
 
-All community participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md). Please report security vulnerabilities privately according to [SECURITY.md](SECURITY.md).
-
-## Repository structure
-
-```text
-constructa/
-├── apps/
-│   ├── web/          # React and TanStack Start web application
-│   ├── cli/          # Command-line application (early scaffold)
-│   └── api/          # Future public API scaffold
-├── packages/
-│   ├── schema/       # Portable generator definitions and validation types
-│   ├── core/         # Registry and UI-agnostic execution engine
-│   ├── generators/   # Built-in primitive and composite generators
-│   ├── exporters/    # JSON, CSV, JSON Lines, and other output formats
-│   ├── sdk/          # Stable developer-facing package
-│   ├── config/       # Shared TypeScript configuration
-│   ├── env/          # Environment configuration
-│   └── ui/           # Shared UI components and styles
-└── examples/         # Future public API and CLI examples
+```json
+{
+  "type": "integer",
+  "min": 1,
+  "max": 100
+}
 ```
 
-Future-facing packages are intentionally private placeholders. They will become publishable only after their public contracts, tests, documentation, build output, and registry metadata are ready.
+**A composed generator:**
 
-## Development
+```json
+{
+  "type": "object",
+  "fields": {
+    "id": { "type": "uuid" },
+    "score": { "type": "integer", "min": 0, "max": 100 },
+    "status": { "type": "choice", "values": ["pending", "active", "disabled"] }
+  }
+}
+```
 
-### Prerequisites
+**Output:**
 
-- Node.js 22 or newer
-- pnpm 10.32.1 or a compatible version managed through Corepack
+```json
+{
+  "id": "7e21b456-...",
+  "score": 84,
+  "status": "active"
+}
+```
 
-Install dependencies:
+The object generator does not know how UUIDs, integers, or choices work. **It asks Constructa to execute its child generators.** That is what makes the system extensible.
+
+<br>
+
+## 📦 Install
+
+> [!NOTE]
+> Constructa is currently in **early development**.
+
+**Requirements**
+
+- Node.js 22+
+- pnpm 10.32.1 or a compatible Corepack-managed version
 
 ```bash
+# Clone the repository
+git clone https://github.com/Jack-WebDev/constructa.git
+cd constructa
+
+# Install dependencies
 pnpm install
+
+# Start the development environment
+pnpm dev
 ```
 
-Start the development environment:
+The web application runs at:
+
+```text
+http://localhost:3001
+```
+
+> [!WARNING]
+> Public packages are still evolving and should not yet be considered stable.
+
+<br>
+
+## 🎨 Use Constructa
+
+Constructa is being built around two ways of working.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+### ⚡ Quick Generate
+
+Need one value? Pick a generator, configure it, and generate.
+
+```text
+Integer
+
+Min     1
+Max     100
+
+[ Generate ]
+
+47
+```
+
+You should not need to understand schemas or composition just to generate a simple value.
+
+</td>
+<td width="50%" valign="top">
+
+### 🧱 Visual Generator Builder
+
+Need something more specific? Compose generators visually:
+
+```text
+Customer
+
+├── id
+│   └── UUID
+│
+├── age
+│   └── Integer
+│       ├── min: 18
+│       └── max: 80
+│
+├── plan
+│   └── Choice
+│       ├── free
+│       ├── pro
+│       └── enterprise
+│
+└── active
+    └── Boolean
+```
+
+Then generate one record or thousands of them.
+
+</td>
+</tr>
+</table>
+
+> The goal is to make composition available **without requiring users to write code**.
+
+<br>
+
+## 🛠️ Built-in generators
+
+The initial generator library is deliberately small.
+
+| 🔹 Primitive | 🔷 Composite |
+| --- | --- |
+| Integer | Object |
+| Decimal | Array |
+| Boolean | Template |
+| Choice | |
+| String | |
+| Date | |
+| UUID | |
+
+> Constructa is not trying to win by having the longest list of generators. The goal is to make generators useful **together**.
+
+<br>
+
+## 🔐 Can I trust it?
+
+Constructa is open source and available under the [MIT License](LICENSE).
+
+**Generator definitions are treated as data, not executable JavaScript.**
+
+A definition like:
+
+```json
+{
+  "type": "integer",
+  "min": 1,
+  "max": 10
+}
+```
+
+describes what Constructa should execute rather than injecting arbitrary code into the engine.
+
+Constructa is also designed so that the generation engine remains **independent from the web interface**. Core generation behavior can therefore be tested without depending on React, forms, routes, or other UI concerns.
+
+🛡️ Security vulnerabilities should be reported privately according to [SECURITY.md](SECURITY.md).
+
+<br>
+
+## 🗺️ Where is Constructa going?
+
+The current focus is the generator engine and visual builder.
+
+The longer-term idea is simple:
+
+<div align="center">
+
+> ### 🎯 Define a generator once. Run it anywhere
+
+</div>
+
+```text
+                    Generator Definition
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+             Web           SDK           CLI
+                            │
+                            ▼
+                           API
+```
+
+A generator created visually should eventually be usable from JavaScript:
+
+```ts
+const users = generate(userGenerator, {
+  count: 100,
+});
+```
+
+from the terminal:
 
 ```bash
-pnpm run dev
+constructa generate user --count 100
 ```
 
-The web application is available at [http://localhost:3001](http://localhost:3001).
+or through an API without rewriting its definition.
 
-### Available scripts
+**Planned capabilities include:**
 
-- `pnpm run dev` — start all applications in development mode
-- `pnpm run dev:web` — start only the web application
-- `pnpm run build` — build all applications and packages
-- `pnpm run check-types` — run TypeScript checks across the monorepo
-- `pnpm run check` — check formatting, linting, and architecture boundaries
-- `pnpm run check:architecture` — validate workspace manifests and imports against the documented dependency graph
-- `pnpm run check:fix` — apply safe Biome formatting and lint fixes
-- `pnpm run test` — run all unit tests once with Vitest
-- `pnpm run test:watch` — run Vitest in watch mode
-- `pnpm run test:coverage` — run tests and generate a coverage report
-- `pnpm changeset` — describe a user-facing package change
-- `pnpm run changeset:status` — inspect pending package releases
-- `pnpm run prepare` — initialize Git hooks
+<table>
+<tr>
+<td>
 
-## Package releases
+- 🎲 Seeded & deterministic generation
+- 📊 Bulk datasets
+- 📤 JSON, CSV, JSON Lines & SQL exports
+- 💾 Saved generators
+- 🔗 Generator sharing
+- 🏷️ Generator versioning
 
-Constructa uses Changesets as the source of package versions and changelogs. Publishable packages will be released to npm, and packages with a `jsr.json` configuration will also be released to JSR.
+</td>
+<td>
 
-See [RELEASING.md](RELEASING.md) for the release process and registry setup requirements.
+- 🔀 References between generated fields
+- 📄 Templates
+- ⚙️ Limited conditional generation
+- ♻️ Reusable generator presets
+- 📚 JavaScript/TypeScript SDK
+- 💻 CLI
 
-## Technology
+</td>
+<td>
 
-The current application foundation includes TypeScript, React, TanStack Start, TanStack Router, Tailwind CSS, shadcn/ui, Turborepo, tsdown, Vitest, Biome, and pnpm workspaces.
+- 🌐 Public API
+- 🌍 Community generators
+- 🔌 Integrations
+- 🧰 Sandboxed plugins
 
-## License
+</td>
+</tr>
+</table>
+
+> These are long-term directions, not promises for the current release.
+
+<br>
+
+## 📊 Project status
+
+Constructa is in **early development**.
+
+The immediate goal is to prove the core composition model:
+
+```text
+Small generators
+       +
+Small generators
+       +
+Small generators
+       │
+       ▼
+Useful custom generator
+```
+
+🎯 The first major milestone is an engine capable of executing nested generator definitions without composite generators needing to understand the implementation of their children.
+
+<br>
+
+## 🧑‍💻 Development
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start the development environment
+pnpm dev
+
+# Start only the web application
+pnpm dev:web
+```
+
+**Useful commands**
+
+```bash
+pnpm build
+pnpm check
+pnpm check-types
+pnpm check:architecture
+pnpm test
+pnpm test:coverage
+```
+
+📘 For package responsibilities and dependency rules, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+🚢 For release details, see [RELEASING.md](RELEASING.md).
+
+<br>
+
+## 🤝 Contributing
+
+Contributions are welcome!
+
+Bug reports, feature proposals, documentation improvements, and code contributions are all useful while Constructa is still taking shape.
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before starting substantial work.
+
+Community participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+<br>
+
+## 📄 License
 
 Constructa is available under the [MIT License](LICENSE).
+
+<br>
+
+<div align="center">
+
+**Constructa is not trying to become the website with the most generators.**
+
+### It is trying to become the system you use when the generator you need does not exist yet
+
+<sub>🧬 Small generators. Composed well.</sub>
+
+</div>
