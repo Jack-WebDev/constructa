@@ -234,9 +234,9 @@ describe("template token parsing", () => {
     ["{", "missing a closing brace"],
     ["}", "unmatched closing brace"],
     ["{}", "must not be empty"],
-    ["{first..last}", "must be non-empty"],
-    ["{first name}", "cannot contain whitespace"],
-    ["{first{last}}", "cannot contain whitespace or braces"],
+    ["{first..last}", "must use letters"],
+    ["{first name}", "must use letters"],
+    ["{first{last}}", "must use letters"],
   ])("rejects malformed syntax: %s", (source, message) => {
     expect(() => parseTemplateTokens(source, { path: ["source"] })).toThrow(
       expect.objectContaining({

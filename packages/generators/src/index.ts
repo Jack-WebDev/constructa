@@ -5,6 +5,7 @@ import {
   type GeneratorDefinition,
   type GeneratorImplementation,
   type GeneratorRegistry,
+  parseTemplateTokens,
   scheduleCompositeDependencies,
   type ValidationIssue,
 } from "constructa-core";
@@ -112,6 +113,51 @@ export const objectGenerator: GeneratorImplementation<
 
 export function registerObjectGenerator(registry: GeneratorRegistry): void {
   registry.register(objectGenerator);
+}
+
+export type TemplateDefinition = GeneratorDefinition<string> & {
+  readonly type: "template";
+  readonly source: string;
+};
+
+/** Builds a string template with object-local `{field}` references. */
+export function template(source: string): TemplateDefinition;
+export function template(source: unknown): TemplateDefinition {
+  const issues = validateTemplateDefinition({ type: "template", source });
+  assertValidGeneratorOptions(issues);
+  return createGeneratorDefinition({
+    type: "template",
+    source: source as string,
+  }) as TemplateDefinition;
+}
+
+export const templateGenerator: GeneratorImplementation<
+  TemplateDefinition,
+  string
+> = defineGenerator({
+  type: "template",
+  version: 1,
+  validateDefinition: validateTemplateDefinition,
+  analyzeValueDependencies({ source }) {
+    return parseTemplateTokens(source, { path: ["source"] })
+      .filter((token) => token.type === "reference")
+      .map((token) => ({ path: token.path }));
+  },
+  generate({ definition, context }) {
+    return parseTemplateTokens(definition.source, { path: ["source"] })
+      .map((token) => {
+        if (token.type === "literal") return token.value;
+        return stringifyTemplateValue(
+          context.references.resolve(token.path),
+          context.path,
+        );
+      })
+      .join("");
+  },
+});
+
+export function registerTemplateGenerator(registry: GeneratorRegistry): void {
+  registry.register(templateGenerator);
 }
 
 export type ArrayOptions = {
@@ -466,6 +512,32 @@ function validateObjectDefinition(value: unknown): readonly ValidationIssue[] {
   return issues;
 }
 
+function validateTemplateDefinition(
+  value: unknown,
+): readonly ValidationIssue[] {
+  const keyIssues = validateExactDefinitionKeys(value, "template", ["source"]);
+  if (keyIssues.length > 0) return keyIssues;
+  const source = (value as { readonly source?: unknown }).source;
+  if (typeof source !== "string") {
+    return [invalidConfiguration(["source"], "source must be a string")];
+  }
+  try {
+    parseTemplateTokens(source, { path: ["source"] });
+  } catch (cause) {
+    if (cause instanceof ConstructaError) {
+      return [
+        {
+          code: "invalid_template_token",
+          path: cause.path,
+          message: cause.message,
+        },
+      ];
+    }
+    throw cause;
+  }
+  return [];
+}
+
 function validateArrayDefinition(value: unknown): readonly ValidationIssue[] {
   const keyIssues = validateExactDefinitionKeys(value, "array", [
     "item",
@@ -656,6 +728,7 @@ function assertValidGeneratorOptions(issues: readonly ValidationIssue[]): void {
     empty_choice: "EMPTY_CHOICE",
     invalid_length: "INVALID_LENGTH",
     invalid_range: "INVALID_RANGE",
+    invalid_template_token: "INVALID_TEMPLATE_TOKEN",
   };
   throw new ConstructaError({
     kind: "configuration",
@@ -663,6 +736,26 @@ function assertValidGeneratorOptions(issues: readonly ValidationIssue[]): void {
     path: issue.path,
     message: issue.message,
     details: { issueCode: issue.code },
+  });
+}
+
+function stringifyTemplateValue(
+  value: unknown,
+  path: readonly (string | number)[],
+): string {
+  if (
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    value === null
+  ) {
+    return String(value);
+  }
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  throw new ConstructaError({
+    kind: "dependency",
+    code: "NON_SCALAR_REFERENCE",
+    path,
+    message: "Template references must resolve to a scalar value.",
   });
 }
 

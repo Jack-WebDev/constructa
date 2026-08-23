@@ -40,6 +40,10 @@ The first implementation set will include integer, boolean, choice, decimal, str
 
 `array(item, { length })` creates one fixed-length array value and infers `Infer<typeof item>[]`. Length must be a non-negative safe integer no greater than 10,000. Array items are delegated through the execution engine using numeric index path segments; this is distinct from repeated root execution. `registerArrayGenerator(registry)` is available for advanced custom registries.
 
+## Template
+
+`template(source)` returns a string definition that interpolates object-local `{field}` and `{sibling.nested}` values. `{{` and `}}` emit literal braces. Only strings, finite numbers, booleans, and `null` can be interpolated; objects and arrays fail with `NON_SCALAR_REFERENCE`. Templates do not support expressions, transforms, or functions. `registerTemplateGenerator(registry)` is available for advanced custom registries.
+
 ## Dependency boundary
 
 This package may import `constructa-core` for the generator contract and registration APIs, and `constructa-schema` for portable definitions. It must not import exporters, the SDK, applications, UI, environment, persistence, or transport code.
