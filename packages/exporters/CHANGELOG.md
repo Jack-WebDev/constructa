@@ -1,5 +1,11 @@
 # constructa-exporters
 
+## 0.0.4
+
+### Patch Changes
+
+- ea235b3: Clarify package descriptions to better communicate each public package's role.
+
 ## 0.0.3
 
 ### Patch Changes

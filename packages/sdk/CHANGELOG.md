@@ -1,5 +1,16 @@
 # constructa-sdk
 
+## 0.2.1
+
+### Patch Changes
+
+- ea235b3: Clarify package descriptions to better communicate each public package's role.
+- Updated dependencies [ea235b3]
+  - constructa-core@0.9.3
+  - constructa-schema@2.4.3
+  - constructa-generators@0.4.7
+  - constructa-exporters@0.0.4
+
 ## 0.2.0
 
 ### Minor Changes

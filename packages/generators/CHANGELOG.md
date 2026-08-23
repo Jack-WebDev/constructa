@@ -1,5 +1,14 @@
 # constructa-generators
 
+## 0.4.7
+
+### Patch Changes
+
+- ea235b3: Clarify package descriptions to better communicate each public package's role.
+- Updated dependencies [ea235b3]
+  - constructa-core@0.9.3
+  - constructa-schema@2.4.3
+
 ## 0.4.6
 
 ### Patch Changes

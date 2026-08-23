@@ -1,5 +1,11 @@
 # constructa-schema
 
+## 2.4.3
+
+### Patch Changes
+
+- ea235b3: Clarify package descriptions to better communicate each public package's role.
+
 ## 2.4.2
 
 ### Patch Changes
