@@ -21,6 +21,10 @@ Use `defineGenerator()` for developer-authored executable implementations. An im
 
 `GeneratorDefinition<Output>` carries output information only at compile time; emitted definitions remain plain JSON data. Factories should use `createGeneratorDefinition()` so literal fields are preserved and the resulting definition is portable. Implementations receive randomness and child generation through `GenerationContext`; they must not use global randomness or built-in-specific execution switches.
 
+## Registry
+
+`createRegistry()` is advanced infrastructure. Register trusted implementations explicitly with `register()`. Duplicate type IDs fail without changing registry state; `replace()` is the deliberate replacement path and requires the type to already be registered. `snapshot()` returns an immutable, type-sorted record of registered generator IDs and versions for execution infrastructure. Lookup and dispatch are separate later concerns.
+
 ## Dependency Boundary
 
 `constructa-schema` is the only Constructa runtime dependency that `constructa-core` may depend on.

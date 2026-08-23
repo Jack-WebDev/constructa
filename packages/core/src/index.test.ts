@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   createGeneratorDefinition,
+  createRegistry,
   defineGenerator,
   type GenerationContext,
   type GeneratorDefinition,
@@ -49,6 +50,19 @@ const integerImplementation: GeneratorImplementation<
     return definition.min + generationContext.random.next();
   },
 });
+
+function implementation(type: string, version = 1) {
+  return defineGenerator({
+    type,
+    version,
+    validateDefinition() {
+      return [];
+    },
+    generate() {
+      return type;
+    },
+  });
+}
 
 describe("generator implementation contract", () => {
   it("preserves factory literals and infers primitive output without caller generics", () => {
@@ -164,6 +178,102 @@ describe("generator implementation contract", () => {
         kind: "configuration",
         code: "INVALID_CONFIGURATION",
         path: ["definition", "min"],
+      }),
+    );
+  });
+});
+
+describe("generator registry", () => {
+  it("registers implementations and creates immutable, order-independent snapshots", () => {
+    const registry = createRegistry();
+    registry.register(implementation("zebra"));
+    registry.register(implementation("alpha", 2));
+    const snapshot = registry.snapshot();
+
+    expect(snapshot.generators).toEqual([
+      { type: "alpha", version: 2 },
+      { type: "zebra", version: 1 },
+    ]);
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.generators)).toBe(true);
+
+    registry.register(implementation("middle"));
+    expect(snapshot.generators).toHaveLength(2);
+    expect(registry.snapshot().generators.map(({ type }) => type)).toEqual([
+      "alpha",
+      "middle",
+      "zebra",
+    ]);
+  });
+
+  it("copies implementations into the registry snapshot boundary", () => {
+    const registry = createRegistry();
+    const registered = implementation("integer", 1);
+    registry.register(registered);
+    (registered as { version: number }).version = 99;
+
+    expect(registry.snapshot().generators).toEqual([
+      { type: "integer", version: 1 },
+    ]);
+  });
+
+  it("rejects duplicate and reserved IDs without changing registry state", () => {
+    const registry = createRegistry();
+    registry.register(implementation("integer"));
+
+    expect(() => registry.register(implementation("integer", 2))).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "DUPLICATE_GENERATOR",
+        path: ["type"],
+      }),
+    );
+    expect(() => registry.register(implementation("constructor"))).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: ["type"],
+      }),
+    );
+    expect(registry.snapshot().generators).toEqual([
+      { type: "integer", version: 1 },
+    ]);
+  });
+
+  it("replaces a registered implementation only through the explicit API", () => {
+    const registry = createRegistry();
+    registry.register(implementation("integer", 1));
+    registry.replace(implementation("integer", 2));
+
+    expect(registry.snapshot().generators).toEqual([
+      { type: "integer", version: 2 },
+    ]);
+    expect(() => registry.replace(implementation("missing"))).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "UNKNOWN_GENERATOR",
+        path: ["type"],
+      }),
+    );
+  });
+
+  it("returns structured errors for malformed runtime registrations", () => {
+    const registry = createRegistry();
+    const malformed = {
+      type: "integer",
+      version: 0,
+      validateDefinition: () => [],
+      generate: () => 1,
+    } as unknown as GeneratorImplementation<
+      GeneratorDefinition<number>,
+      number
+    >;
+
+    expect(() => registry.register(malformed)).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: ["implementation"],
       }),
     );
   });
