@@ -2,9 +2,13 @@ import { createExecutor, createRegistry, type Infer } from "constructa-core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
+  type BooleanDefinition,
+  boolean,
+  booleanGenerator,
   type IntegerDefinition,
   integer,
   integerGenerator,
+  registerBooleanGenerator,
   registerIntegerGenerator,
 } from "./index";
 
@@ -84,6 +88,54 @@ describe("integer", () => {
         kind: "configuration",
         code: "INVALID_RANGE",
         path: ["min"],
+      }),
+    );
+  });
+});
+
+describe("boolean", () => {
+  it("creates a portable definition with boolean output inference", () => {
+    const definition = boolean();
+
+    expectTypeOf<Infer<typeof definition>>().toEqualTypeOf<boolean>();
+    expectTypeOf(definition).toEqualTypeOf<BooleanDefinition>();
+    expect(definition).toEqual({ type: "boolean" });
+    expect(JSON.parse(JSON.stringify(definition))).toEqual(definition);
+  });
+
+  it("uses injected random draws for an exactly balanced selection", () => {
+    const registry = createRegistry();
+    registerBooleanGenerator(registry);
+    const executor = createExecutor(registry);
+    const integerCalls: number[] = [];
+    const random = (value: number) => ({
+      float: () => 0,
+      integer(maxExclusive: number) {
+        integerCalls.push(maxExclusive);
+        return value;
+      },
+      bytes: (length: number) => new Uint8Array(length),
+    });
+
+    expect(executor.generate(boolean(), { random: random(0) })).toBe(false);
+    expect(executor.generate(boolean(), { random: random(1) })).toBe(true);
+    expect(integerCalls).toEqual([2, 2]);
+  });
+
+  it("rejects unknown definition properties at their exact path", () => {
+    const registry = createRegistry();
+    registry.register(booleanGenerator);
+
+    expect(() =>
+      createExecutor(registry).generate(
+        { type: "boolean", unexpected: true },
+        { seed: 1 },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: ["unexpected"],
       }),
     );
   });

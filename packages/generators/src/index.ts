@@ -13,6 +13,33 @@ export type IntegerOptions = {
   readonly max: number;
 };
 
+export type BooleanDefinition = GeneratorDefinition<boolean> & {
+  readonly type: "boolean";
+};
+
+/** Builds a portable, evenly distributed boolean definition. */
+export function boolean(): BooleanDefinition {
+  return createGeneratorDefinition({ type: "boolean" }) as BooleanDefinition;
+}
+
+/** Trusted implementation for the portable `boolean` definition. */
+export const booleanGenerator: GeneratorImplementation<
+  BooleanDefinition,
+  boolean
+> = defineGenerator({
+  type: "boolean",
+  version: 1,
+  validateDefinition: validateBooleanDefinition,
+  generate({ context }) {
+    return context.random.integer(2) === 1;
+  },
+});
+
+/** Registers the boolean built-in with an advanced custom registry. */
+export function registerBooleanGenerator(registry: GeneratorRegistry): void {
+  registry.register(booleanGenerator);
+}
+
 export type IntegerDefinition = GeneratorDefinition<number> & {
   readonly type: "integer";
   readonly min: number;
@@ -92,6 +119,25 @@ function validateIntegerDefinition(value: unknown): readonly ValidationIssue[] {
     ];
   }
   return [];
+}
+
+function validateBooleanDefinition(value: unknown): readonly ValidationIssue[] {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return [
+      {
+        code: "invalid_boolean_definition",
+        path: [],
+        message: "boolean definition must be an object",
+      },
+    ];
+  }
+  return Object.keys(value)
+    .filter((key) => key !== "type")
+    .map((key) => ({
+      code: "unknown_property",
+      path: [key],
+      message: `Unknown boolean property: ${key}`,
+    }));
 }
 
 function invalidRange(
