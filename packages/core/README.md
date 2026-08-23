@@ -25,6 +25,8 @@ Use `defineGenerator()` for developer-authored executable implementations. An im
 
 Use `parseDefinition(value, { registry, limits? })` for untrusted runtime definition data, or `parseDocument(value, { registry, limits? })` for a versioned document. Both validate portable JSON, registered generator IDs, each implementation's configuration, and nested typed definitions without invoking `generate`. `safeParseDefinition()` and `safeParseDocument()` return all bounded, deterministic structured issues; the throwing forms return the first issue. Definitions parsed from dynamic data intentionally have broad `GeneratorDefinition` output typing.
 
+`parseTemplateTokens(source, { path? })` parses the MVP `{field}` and `{sibling.nested}` reference syntax into literal and reference tokens without resolving a value. Use `{{` and `}}` for literal braces. Empty paths, whitespace, braces inside a reference, and empty dot segments fail with `INVALID_TEMPLATE_TOKEN` at the supplied definition path.
+
 ## Random sources
 
 `RandomSource` exposes `float()` in `[0, 1)`, `integer(maxExclusive)` in `[0, maxExclusive)`, and `bytes(length)` with exactly the requested number of bytes. Use `createRandomSource()` to validate injected adapters or `createDefaultRandomSource()` for the platform-backed source. Invalid source output is a system error; Constructa never substitutes biased fallback randomness. The default source uses platform cryptographic bytes, but this package makes no claim that generated values are suitable for a security-sensitive use case.

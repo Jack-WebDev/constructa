@@ -248,6 +248,116 @@ export type GenerationContext = {
 /** A property path relative to the object containing a reference. */
 export type ReferencePath = readonly string[];
 
+/** A parsed template fragment. Braces are escaped with `{{` and `}}`. */
+export type TemplateToken =
+  | { readonly type: "literal"; readonly value: string }
+  | { readonly type: "reference"; readonly path: ReferencePath };
+
+export type ParseTemplateTokensOptions = {
+  /** Definition-relative path reported for malformed template syntax. */
+  readonly path?: ValidationPath;
+};
+
+/**
+ * Parses MVP template syntax without executing or resolving references.
+ *
+ * `{field}` addresses a sibling and `{field.nested}` addresses a value below
+ * that sibling. `{{` and `}}` emit literal braces. Whitespace, empty path
+ * segments, and brace characters inside a reference are unsupported.
+ */
+export function parseTemplateTokens(
+  source: string,
+  options: ParseTemplateTokensOptions = {},
+): readonly TemplateToken[] {
+  const path = options.path ?? [];
+  if (typeof source !== "string") {
+    throw templateTokenError(path, "Template source must be a string.");
+  }
+  assertContextPath(path);
+
+  const tokens: TemplateToken[] = [];
+  let literal = "";
+  const appendLiteral = (value: string) => {
+    literal += value;
+  };
+  const flushLiteral = () => {
+    if (literal.length === 0) return;
+    tokens.push(Object.freeze({ type: "literal", value: literal }));
+    literal = "";
+  };
+
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === "{") {
+      if (source[index + 1] === "{") {
+        appendLiteral("{");
+        index += 1;
+        continue;
+      }
+      const closingIndex = source.indexOf("}", index + 1);
+      if (closingIndex === -1) {
+        throw templateTokenError(
+          path,
+          "Template reference is missing a closing brace.",
+        );
+      }
+      const reference = source.slice(index + 1, closingIndex);
+      const referencePath = parseReferencePath(reference, path);
+      flushLiteral();
+      tokens.push(Object.freeze({ type: "reference", path: referencePath }));
+      index = closingIndex;
+      continue;
+    }
+    if (character === "}") {
+      if (source[index + 1] === "}") {
+        appendLiteral("}");
+        index += 1;
+        continue;
+      }
+      throw templateTokenError(
+        path,
+        "Template contains an unmatched closing brace.",
+      );
+    }
+    appendLiteral(character ?? "");
+  }
+  flushLiteral();
+  return Object.freeze(tokens);
+}
+
+/** Parses one dot-separated object-local reference path. */
+export function parseReferencePath(
+  source: string,
+  path: ValidationPath = [],
+): ReferencePath {
+  if (typeof source !== "string" || source.length === 0) {
+    throw templateTokenError(path, "Template reference must not be empty.");
+  }
+  assertContextPath(path);
+  const segments = source.split(".");
+  if (
+    segments.some((segment) => segment.length === 0 || /[{}\s]/u.test(segment))
+  ) {
+    throw templateTokenError(
+      path,
+      "Template reference segments must be non-empty and cannot contain whitespace or braces.",
+    );
+  }
+  return Object.freeze(segments);
+}
+
+function templateTokenError(
+  path: ValidationPath,
+  message: string,
+): ConstructaError {
+  return new ConstructaError({
+    kind: "configuration",
+    code: "INVALID_TEMPLATE_TOKEN",
+    path,
+    message,
+  });
+}
+
 /** A portable value dependency declared by a generator definition. */
 export type ValueDependency = {
   readonly path: ReferencePath;
