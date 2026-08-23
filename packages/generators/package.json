@@ -1,6 +1,6 @@
 {
   "name": "constructa-generators",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Built-in primitive and composite generators for Constructa.",
   "private": false,
   "license": "MIT",
