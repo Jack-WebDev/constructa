@@ -29,12 +29,15 @@ export type RandomSource = {
   bytes(length: number): Uint8Array;
 };
 
+/** An application-provided random source validated by `createRandomSource`. */
 export type RandomSourceAdapter = RandomSource;
 
 const validatedRandomSources = new WeakSet<object>();
 
+/** A deterministic random-source seed. */
 export type Seed = number | string;
 
+/** Per-root-execution limits and random-source options. */
 export type ExecutionOptions = {
   /** Uses a fresh deterministic source for this root execution. */
   readonly seed?: Seed;
@@ -51,6 +54,7 @@ export type ExecutionOptions = {
   readonly deadline?: number;
 };
 
+/** Executes validated generator definitions through a registry snapshot. */
 export type Executor = {
   generate: <Definition extends GeneratorDefinition>(
     definition: Definition,
@@ -58,14 +62,18 @@ export type Executor = {
   ) => import("constructa-schema").Infer<Definition>;
 };
 
+/** The deterministic random algorithm used by `createSeededRandom`. */
 export const SEEDED_RANDOM_ALGORITHM = "mulberry32";
+/** The compatibility version of the seeded random algorithm. */
 export const SEEDED_RANDOM_ALGORITHM_VERSION = 1;
 
+/** Public metadata identifying the seeded random algorithm. */
 export type SeededRandomMetadata = {
   readonly algorithm: typeof SEEDED_RANDOM_ALGORITHM;
   readonly version: typeof SEEDED_RANDOM_ALGORITHM_VERSION;
 };
 
+/** Values that must remain compatible to reproduce an execution. */
 export type DeterminismCompatibility = {
   readonly engineVersion: string;
   readonly generatorImplementationVersion: number;
@@ -226,6 +234,7 @@ export function getSeededRandomMetadata(): SeededRandomMetadata {
 }
 
 /** Services supplied by the engine. Implementations must not use global randomness. */
+/** Capabilities supplied to a trusted generator implementation. */
 export type GenerationContext = {
   readonly random: RandomSource;
   /** The definition path currently being generated. */
@@ -250,13 +259,16 @@ export type GenerationContext = {
 };
 
 /** A property path relative to the object containing a reference. */
+/** A property path used by an object-local template reference. */
 export type ReferencePath = readonly string[];
 
 /** A parsed template fragment. Braces are escaped with `{{` and `}}`. */
+/** One literal or reference segment of parsed template source. */
 export type TemplateToken =
   | { readonly type: "literal"; readonly value: string }
   | { readonly type: "reference"; readonly path: ReferencePath };
 
+/** Options controlling template-token parse diagnostics. */
 export type ParseTemplateTokensOptions = {
   /** Definition-relative path reported for malformed template syntax. */
   readonly path?: ValidationPath;
@@ -365,21 +377,25 @@ function templateTokenError(
 }
 
 /** A portable value dependency declared by a generator definition. */
+/** One value dependency declared by a child generator. */
 export type ValueDependency = {
   readonly path: ReferencePath;
 };
 
 /** Dependencies for a direct field in a composite definition. */
+/** A composite child and the values it depends on. */
 export type CompositeDependencyNode = {
   readonly fieldPath: readonly [string];
   readonly dependencies: readonly ValueDependency[];
 };
 
 /** Portable dependency data used to schedule one composite object. */
+/** An immutable analysis of composite-child dependencies. */
 export type CompositeDependencyAnalysis = {
   readonly nodes: readonly CompositeDependencyNode[];
 };
 
+/** Options used to order dependent composite children. */
 export type CompositeDependencySchedulingOptions = {
   /** Every reference path that exists in the containing object definition. */
   readonly referencePaths?: readonly ReferencePath[];
@@ -390,11 +406,13 @@ export type CompositeDependencySchedulingOptions = {
 };
 
 /** The read-only capability supplied to generators that resolve references. */
+/** Resolves values visible to an executing generator. */
 export type ReferenceResolver = {
   resolve: (path: ReferencePath) => unknown;
 };
 
 /** Executes and records completed fields within one isolated object scope. */
+/** An isolated object-field execution scope. */
 export type ObjectGenerationScope = {
   executeChild: <Output>(
     definition: GeneratorDefinition<Output>,
@@ -402,6 +420,7 @@ export type ObjectGenerationScope = {
   ) => Output;
 };
 
+/** Inputs used to create a generator execution context. */
 export type GenerationContextOptions = {
   readonly random: RandomSource;
   readonly path?: ValidationPath;
@@ -683,6 +702,7 @@ function findCompositeDependencyCycle(
   return [];
 }
 
+/** Bounds applied while parsing untrusted definitions or documents. */
 export type ParseLimits = {
   readonly maxDepth?: number;
   readonly maxIssues?: number;
@@ -699,6 +719,7 @@ export type ParseLimits = {
   readonly maxTemplateTokens?: number;
 };
 
+/** Options for parsing a portable generator definition. */
 export type ParseDefinitionOptions = {
   readonly registry: Pick<
     GeneratorRegistry | GeneratorRegistrySnapshot,
@@ -707,12 +728,15 @@ export type ParseDefinitionOptions = {
   readonly limits?: ParseLimits;
 };
 
+/** Options for parsing a versioned generator document. */
 export type ParseDocumentOptions = ParseDefinitionOptions;
 
+/** The success-or-failure result returned by `safeParseDefinition`. */
 export type DefinitionParseResult =
   | { readonly success: true; readonly value: ParsedGeneratorDefinition }
   | { readonly success: false; readonly issues: readonly ConstructaError[] };
 
+/** The success-or-failure result returned by `safeParseDocument`. */
 export type DocumentParseResult =
   | {
       readonly success: true;
@@ -781,6 +805,7 @@ export function safeParseDocument(
     : { success: false, issues: definition.issues };
 }
 
+/** A generator type and version required by an implementation. */
 export type GeneratorDependency = {
   readonly typeId: string;
   readonly path: ValidationPath;
@@ -789,12 +814,14 @@ export type GeneratorDependency = {
 declare const parsedGeneratorDefinition: unique symbol;
 
 /** A runtime-validated definition accepted by an executor without revalidation. */
+/** A generator definition already validated against a registry. */
 export type ParsedGeneratorDefinition = GeneratorDefinition & {
   readonly [parsedGeneratorDefinition]: true;
 };
 
 const parsedDefinitions = new WeakSet<object>();
 
+/** A trusted implementation of one portable generator type. */
 export type GeneratorImplementation<
   Definition extends GeneratorDefinition<Output>,
   Output,
@@ -817,11 +844,13 @@ export type GeneratorImplementation<
   }) => Output;
 };
 
+/** A registry entry for one generator type. */
 export type RegisteredGenerator = {
   readonly type: string;
   readonly version: number;
 };
 
+/** An immutable point-in-time view of a generator registry. */
 export type GeneratorRegistrySnapshot = {
   readonly generators: readonly RegisteredGenerator[];
   readonly lookup: (
@@ -830,6 +859,7 @@ export type GeneratorRegistrySnapshot = {
   ) => GeneratorImplementation<GeneratorDefinition, unknown>;
 };
 
+/** A mutable registry of trusted generator implementations. */
 export type GeneratorRegistry = {
   register: <Definition extends GeneratorDefinition<Output>, Output>(
     implementation: GeneratorImplementation<Definition, Output>,

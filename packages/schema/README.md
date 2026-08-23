@@ -2,6 +2,21 @@
 
 Portable generator definitions, versioned generator documents, validation schemas, and related types shared by every Constructa interface.
 
+## Example
+
+Validate an untrusted, versioned document before saving or passing it to an
+execution layer.
+
+```ts
+import { parseDocument } from "jsr:@constructa/schema";
+
+const document = parseDocument({
+  schemaVersion: 1,
+  name: "Adult age",
+  definition: { type: "integer", min: 18, max: 65 },
+});
+```
+
 ## Portable data constraint
 
 Documents and definitions are JSON-only data. Supported values are strings, booleans, `null`, finite numbers other than negative zero, arrays, and plain object records whose properties are all JSON values. Functions, symbols, bigints, `NaN`, infinities, cyclic objects, sparse arrays, custom `toJSON` behavior, class instances, maps, sets, dates, accessors, symbol keys, and non-enumerable properties are rejected.

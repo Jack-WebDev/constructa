@@ -16,8 +16,11 @@ import {
   validateJsonValue,
 } from "constructa-schema";
 
+/** The largest supported decimal precision. */
 export const MAX_DECIMAL_PRECISION = 15;
+/** The largest supported generated-string length. */
 export const MAX_STRING_LENGTH = 10_000;
+/** The largest supported generated-array length. */
 export const MAX_ARRAY_LENGTH = 10_000;
 
 const STRING_CHARSETS = {
@@ -28,6 +31,7 @@ const STRING_CHARSETS = {
   hex: "0123456789abcdef",
 } as const;
 
+/** The portable definition produced by `uuid`. */
 export type UuidDefinition = GeneratorDefinition<string> & {
   readonly type: "uuid";
 };
@@ -37,6 +41,7 @@ export function uuid(): UuidDefinition {
   return createGeneratorDefinition({ type: "uuid" }) as UuidDefinition;
 }
 
+/** The executable implementation for UUID definitions. */
 export const uuidGenerator: GeneratorImplementation<UuidDefinition, string> =
   defineGenerator({
     type: "uuid",
@@ -50,14 +55,18 @@ export const uuidGenerator: GeneratorImplementation<UuidDefinition, string> =
     },
   });
 
+/** Registers the UUID implementation with a registry. */
 export function registerUuidGenerator(registry: GeneratorRegistry): void {
   registry.register(uuidGenerator);
 }
 
+/** The named child definitions of an object generator. */
 export type ObjectFields = Readonly<Record<string, GeneratorDefinition>>;
+/** The inferred output of an object generator's child definitions. */
 export type ObjectOutput<Fields extends ObjectFields> = {
   [Key in keyof Fields]: InferGenerator<Fields[Key]>;
 };
+/** The portable definition produced by `object`. */
 export type ObjectDefinition<Fields extends ObjectFields = ObjectFields> =
   GeneratorDefinition<ObjectOutput<Fields>> & {
     readonly type: "object";
@@ -80,6 +89,7 @@ export function object(fields: unknown): ObjectDefinition {
   }) as ObjectDefinition;
 }
 
+/** The executable implementation for object definitions. */
 export const objectGenerator: GeneratorImplementation<
   ObjectDefinition,
   Record<string, unknown>
@@ -118,10 +128,12 @@ export const objectGenerator: GeneratorImplementation<
   },
 });
 
+/** Registers the object implementation with a registry. */
 export function registerObjectGenerator(registry: GeneratorRegistry): void {
   registry.register(objectGenerator);
 }
 
+/** The portable definition produced by `template`. */
 export type TemplateDefinition = GeneratorDefinition<string> & {
   readonly type: "template";
   readonly source: string;
@@ -138,6 +150,7 @@ export function template(source: unknown): TemplateDefinition {
   }) as TemplateDefinition;
 }
 
+/** The executable implementation for template definitions. */
 export const templateGenerator: GeneratorImplementation<
   TemplateDefinition,
   string
@@ -163,13 +176,16 @@ export const templateGenerator: GeneratorImplementation<
   },
 });
 
+/** Registers the template implementation with a registry. */
 export function registerTemplateGenerator(registry: GeneratorRegistry): void {
   registry.register(templateGenerator);
 }
 
+/** Options for building a fixed-length array definition. */
 export type ArrayOptions = {
   readonly length: number;
 };
+/** The portable definition produced by `array`. */
 export type ArrayDefinition<
   Item extends GeneratorDefinition = GeneratorDefinition,
 > = GeneratorDefinition<InferGenerator<Item>[]> & {
@@ -197,6 +213,7 @@ export function array(item: unknown, options: unknown): ArrayDefinition {
   }) as ArrayDefinition;
 }
 
+/** The executable implementation for array definitions. */
 export const arrayGenerator: GeneratorImplementation<
   ArrayDefinition,
   unknown[]
@@ -213,10 +230,12 @@ export const arrayGenerator: GeneratorImplementation<
   },
 });
 
+/** Registers the array implementation with a registry. */
 export function registerArrayGenerator(registry: GeneratorRegistry): void {
   registry.register(arrayGenerator);
 }
 
+/** The portable definition produced by `choice`. */
 export type ChoiceDefinition<Value extends JsonValue = JsonValue> =
   GeneratorDefinition<Value> & {
     readonly type: "choice";
@@ -235,6 +254,7 @@ export function choice<const Values extends readonly JsonValue[]>(
   }) as ChoiceDefinition<Values[number]>;
 }
 
+/** The executable implementation for choice definitions. */
 export const choiceGenerator: GeneratorImplementation<
   ChoiceDefinition,
   JsonValue
@@ -249,16 +269,19 @@ export const choiceGenerator: GeneratorImplementation<
   },
 });
 
+/** Registers the choice implementation with a registry. */
 export function registerChoiceGenerator(registry: GeneratorRegistry): void {
   registry.register(choiceGenerator);
 }
 
+/** Options for building a bounded decimal definition. */
 export type DecimalOptions = {
   readonly min: number;
   readonly max: number;
   readonly precision: number;
 };
 
+/** The portable definition produced by `decimal`. */
 export type DecimalDefinition = GeneratorDefinition<number> & {
   readonly type: "decimal";
   readonly min: number;
@@ -278,6 +301,7 @@ export function decimal(options: unknown): DecimalDefinition {
   }) as DecimalDefinition;
 }
 
+/** The executable implementation for decimal definitions. */
 export const decimalGenerator: GeneratorImplementation<
   DecimalDefinition,
   number
@@ -293,16 +317,20 @@ export const decimalGenerator: GeneratorImplementation<
   },
 });
 
+/** Registers the decimal implementation with a registry. */
 export function registerDecimalGenerator(registry: GeneratorRegistry): void {
   registry.register(decimalGenerator);
 }
 
+/** A predefined charset name or a non-empty custom character set. */
 export type StringCharset = keyof typeof STRING_CHARSETS | string;
+/** Options for building a random string definition. */
 export type StringOptions = {
   readonly length: number;
   readonly charset?: StringCharset;
 };
 
+/** The portable definition produced by `string`. */
 export type StringDefinition = GeneratorDefinition<string> & {
   readonly type: "string";
   readonly length: number;
@@ -322,6 +350,7 @@ export function string(options: unknown): StringDefinition {
   }) as StringDefinition;
 }
 
+/** The executable implementation for string definitions. */
 export const stringGenerator: GeneratorImplementation<
   StringDefinition,
   string
@@ -339,15 +368,18 @@ export const stringGenerator: GeneratorImplementation<
   },
 });
 
+/** Registers the string implementation with a registry. */
 export function registerStringGenerator(registry: GeneratorRegistry): void {
   registry.register(stringGenerator);
 }
 
+/** Options for building an inclusive ISO calendar-date definition. */
 export type DateOptions = {
   readonly min: string;
   readonly max: string;
 };
 
+/** The portable definition produced by `date`. */
 export type DateDefinition = GeneratorDefinition<string> & {
   readonly type: "date";
   readonly min: string;
@@ -366,6 +398,7 @@ export function date(options: unknown): DateDefinition {
   }) as DateDefinition;
 }
 
+/** The executable implementation for date definitions. */
 export const dateGenerator: GeneratorImplementation<DateDefinition, string> =
   defineGenerator({
     type: "date",
@@ -380,15 +413,18 @@ export const dateGenerator: GeneratorImplementation<DateDefinition, string> =
     },
   });
 
+/** Registers the date implementation with a registry. */
 export function registerDateGenerator(registry: GeneratorRegistry): void {
   registry.register(dateGenerator);
 }
 
+/** Options for building an inclusive integer definition. */
 export type IntegerOptions = {
   readonly min: number;
   readonly max: number;
 };
 
+/** The portable definition produced by `boolean`. */
 export type BooleanDefinition = GeneratorDefinition<boolean> & {
   readonly type: "boolean";
 };
@@ -399,6 +435,7 @@ export function boolean(): BooleanDefinition {
 }
 
 /** Trusted implementation for the portable `boolean` definition. */
+/** The executable implementation for boolean definitions. */
 export const booleanGenerator: GeneratorImplementation<
   BooleanDefinition,
   boolean
@@ -412,10 +449,12 @@ export const booleanGenerator: GeneratorImplementation<
 });
 
 /** Registers the boolean built-in with an advanced custom registry. */
+/** Registers the boolean implementation with a registry. */
 export function registerBooleanGenerator(registry: GeneratorRegistry): void {
   registry.register(booleanGenerator);
 }
 
+/** The portable definition produced by `integer`. */
 export type IntegerDefinition = GeneratorDefinition<number> & {
   readonly type: "integer";
   readonly min: number;
@@ -445,6 +484,7 @@ export function integer(options: unknown): IntegerDefinition {
 }
 
 /** Trusted implementation for the portable `integer` definition. */
+/** The executable implementation for integer definitions. */
 export const integerGenerator: GeneratorImplementation<
   IntegerDefinition,
   number
@@ -459,6 +499,7 @@ export const integerGenerator: GeneratorImplementation<
 });
 
 /** Registers the integer built-in with an advanced custom registry. */
+/** Registers the integer implementation with a registry. */
 export function registerIntegerGenerator(registry: GeneratorRegistry): void {
   registry.register(integerGenerator);
 }

@@ -4,6 +4,20 @@ Built-in generator implementations for Constructa.
 
 The first implementation set will include integer, boolean, choice, decimal, string, date, UUID, object, array, and template generators. Each generator should own its configuration validation, metadata, implementation, and tests while conforming to the common core contract.
 
+## Example
+
+Create a portable definition with the built-in factories. Execute it after
+registering the corresponding implementations with `@constructa/core`.
+
+```ts
+import { integer, object, template } from "jsr:@constructa/generators";
+
+const employee = object({
+  age: integer({ min: 18, max: 65 }),
+  label: template("Employee age: {age}"),
+});
+```
+
 ## Integer
 
 `integer({ min, max })` returns a portable definition whose output is inferred as `number`. Both safe-integer bounds are required and inclusive. `integerGenerator` uses the execution context's random source, and `registerIntegerGenerator(registry)` is available for advanced custom registries.
