@@ -56,6 +56,10 @@ export type RegisteredGenerator = {
 
 export type GeneratorRegistrySnapshot = {
   readonly generators: readonly RegisteredGenerator[];
+  readonly lookup: (
+    type: string,
+    path?: ValidationPath,
+  ) => GeneratorImplementation<GeneratorDefinition, unknown>;
 };
 
 export type GeneratorRegistry = {
@@ -65,6 +69,10 @@ export type GeneratorRegistry = {
   replace: <Definition extends GeneratorDefinition<Output>, Output>(
     implementation: GeneratorImplementation<Definition, Output>,
   ) => void;
+  lookup: (
+    type: string,
+    path?: ValidationPath,
+  ) => GeneratorImplementation<GeneratorDefinition, unknown>;
   snapshot: () => GeneratorRegistrySnapshot;
 };
 
@@ -114,11 +122,11 @@ export function createRegistry(): GeneratorRegistry {
         ) as unknown as GeneratorImplementation<GeneratorDefinition, unknown>,
       );
     },
+    lookup(type, path = []) {
+      return lookupImplementation(implementations, type, path);
+    },
     snapshot() {
-      const generators = [...implementations.values()]
-        .map(({ type, version }) => Object.freeze({ type, version }))
-        .sort((left, right) => left.type.localeCompare(right.type));
-      return Object.freeze({ generators: Object.freeze(generators) });
+      return createRegistrySnapshot(implementations);
     },
   };
 }
@@ -273,6 +281,48 @@ function freezeImplementation<
   implementation: GeneratorImplementation<Definition, Output>,
 ): GeneratorImplementation<Definition, Output> {
   return Object.freeze({ ...implementation });
+}
+
+function createRegistrySnapshot(
+  implementations: ReadonlyMap<
+    string,
+    GeneratorImplementation<GeneratorDefinition, unknown>
+  >,
+): GeneratorRegistrySnapshot {
+  const snapshotImplementations = new Map(implementations);
+  const generators = [...snapshotImplementations.values()]
+    .map(({ type, version }) => Object.freeze({ type, version }))
+    .sort((left, right) => left.type.localeCompare(right.type));
+
+  return Object.freeze({
+    generators: Object.freeze(generators),
+    lookup(type: string, path: ValidationPath = []) {
+      return lookupImplementation(snapshotImplementations, type, path);
+    },
+  });
+}
+
+function lookupImplementation(
+  implementations: ReadonlyMap<
+    string,
+    GeneratorImplementation<GeneratorDefinition, unknown>
+  >,
+  type: string,
+  path: ValidationPath,
+): GeneratorImplementation<GeneratorDefinition, unknown> {
+  const implementation = implementations.get(type);
+  if (implementation !== undefined) return implementation;
+
+  const registeredTypes = [...implementations.keys()].sort((left, right) =>
+    left.localeCompare(right),
+  );
+  throw new ConstructaError({
+    kind: "dependency",
+    code: "UNKNOWN_GENERATOR",
+    path: [...path, "type"],
+    message: `No generator with type "${type}" is registered.`,
+    details: { registeredTypes },
+  });
 }
 
 function registryError(

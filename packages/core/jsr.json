@@ -4,6 +4,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "imports": {
+    "constructa-schema": "jsr:@constructa/schema@^0.2.0"
+  },
   "publish": {
     "include": ["src", "README.md", "package.json"],
     "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
