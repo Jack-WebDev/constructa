@@ -1,5 +1,15 @@
 # constructa-schema
 
+## 2.0.0
+
+### Major Changes
+
+- 4a99afc: Replace string-path validation failures with segment-based validation issues and aggregate document and nested definition validation APIs.
+
+### Minor Changes
+
+- 4a99afc: Add portable semantic generator metadata, including stable IDs, descriptions, categories, output hints, documentation links, and JSON-only examples.
+
 ## 1.0.0
 
 ### Major Changes
