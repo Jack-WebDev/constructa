@@ -129,6 +129,13 @@ export type GeneratorDocumentV1 = {
 
 export type GeneratorDocument = GeneratorDocumentV1;
 
+/** An explicit one-step migration into a supported document schema version. */
+export type DocumentMigration = {
+  readonly from: number;
+  readonly to: SchemaVersion;
+  readonly migrate: (document: JsonObject) => unknown;
+};
+
 /** Reusable portable definitions for serialization and integration fixtures. */
 export const SERIALIZATION_DEFINITION_FIXTURES: readonly GeneratorDefinition[] =
   Object.freeze([
@@ -410,8 +417,8 @@ export function parseDocument(
   value: unknown,
   path: ValidationPath = [],
 ): GeneratorDocumentV1 {
-  assertDocument(value, path);
-  return value;
+  const parser = resolveDocumentParser(value, path);
+  return parser(value, path);
 }
 export function safeParseDocument(
   value: unknown,
@@ -421,6 +428,111 @@ export function safeParseDocument(
   return failure === undefined
     ? { success: true, value: value as GeneratorDocumentV1 }
     : { success: false, failure };
+}
+
+/**
+ * Applies one declared migration and validates its result through the normal
+ * version parser. Migrations are never applied implicitly by `parseDocument`.
+ */
+export function migrateDocument(
+  value: unknown,
+  migration: DocumentMigration,
+): GeneratorDocumentV1 {
+  assertDocumentMigration(migration);
+  assertJsonValue(value);
+  if (!isJsonRecord(value)) {
+    throw new GeneratorDocumentError(
+      documentFailure("generator_document_not_object", []),
+    );
+  }
+  const sourceVersion = value.schemaVersion;
+  if (
+    !Number.isSafeInteger(sourceVersion) ||
+    sourceVersion !== migration.from
+  ) {
+    throw new SchemaVersionError({
+      code: "schema_version_unsupported",
+      path: ["schemaVersion"],
+      severity: "error",
+      message: `schemaVersion must be ${migration.from} before this migration.`,
+      details: { supportedVersions: [migration.to] },
+    });
+  }
+
+  const source = JSON.parse(JSON.stringify(value)) as JsonObject;
+  let migrated: unknown;
+  try {
+    migrated = migration.migrate(source);
+  } catch (cause) {
+    throw normalizeConstructaError(cause, {
+      kind: "configuration",
+      code: "INVALID_CONFIGURATION",
+      path: ["migration"],
+      message: "Document migration failed.",
+    });
+  }
+  return parseDocument(migrated);
+}
+
+type DocumentParser = (
+  value: unknown,
+  path: ValidationPath,
+) => GeneratorDocumentV1;
+
+const DOCUMENT_PARSERS: ReadonlyMap<SchemaVersion, DocumentParser> = new Map([
+  [CURRENT_SCHEMA_VERSION, parseCurrentDocument],
+]);
+
+function resolveDocumentParser(
+  value: unknown,
+  path: ValidationPath,
+): DocumentParser {
+  if (!isJsonRecord(value) || !Object.hasOwn(value, "schemaVersion")) {
+    assertDocument(value, path);
+    throw new ConstructaError({
+      kind: "system",
+      code: "INVALID_CONFIGURATION",
+      path,
+      message:
+        "Document validation unexpectedly succeeded without a schema version.",
+    });
+  }
+  const parser = DOCUMENT_PARSERS.get(value.schemaVersion as SchemaVersion);
+  if (parser === undefined) {
+    const failure = findSchemaVersionValueFailure(
+      value.schemaVersion,
+      appendPathSegment(path, "schemaVersion"),
+    );
+    if (failure !== undefined) throw new SchemaVersionError(failure);
+  }
+  return parser ?? parseCurrentDocument;
+}
+
+function parseCurrentDocument(
+  value: unknown,
+  path: ValidationPath,
+): GeneratorDocumentV1 {
+  assertDocument(value, path);
+  return value;
+}
+
+function assertDocumentMigration(migration: DocumentMigration): void {
+  if (
+    typeof migration !== "object" ||
+    migration === null ||
+    !Number.isSafeInteger(migration.from) ||
+    migration.from < 0 ||
+    !isSchemaVersion(migration.to) ||
+    typeof migration.migrate !== "function"
+  ) {
+    throw new ConstructaError({
+      kind: "configuration",
+      code: "INVALID_CONFIGURATION",
+      path: ["migration"],
+      message:
+        "A migration must declare a non-negative source version, a supported target version, and a migrate function.",
+    });
+  }
 }
 
 /**

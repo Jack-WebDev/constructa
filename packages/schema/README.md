@@ -31,6 +31,8 @@ A `GeneratorDocumentV1` wraps exactly one root definition and carries versioning
 
 Use `parseDocument` to validate and obtain a `GeneratorDocumentV1`, or `safeParseDocument` for a non-throwing parse result. Use `isGeneratorDefinition` or `assertGeneratorDefinition` when validating an unwrapped definition.
 
+`parseDocument` dispatches only supported schema versions and never migrates input implicitly. Unsupported versions throw `UNSUPPORTED_SCHEMA_VERSION` at `schemaVersion`. To migrate an older portable document deliberately, call `migrateDocument(value, { from, to, migrate })`; the migration receives a JSON copy, and its result is validated through the target version parser.
+
 Use `serializeDefinition()` or `serializeDocument()` when stable JSON text is needed for storage, review, or diffs. Both validate their input through the same schema boundary and emit two-space JSON with recursively sorted object keys and one trailing newline. The serialized text remains ordinary JSON and round-trips through `JSON.parse`; generated values are not documents and cannot be serialized as one.
 
 ## Validation issues
