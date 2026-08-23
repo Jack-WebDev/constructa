@@ -1,5 +1,11 @@
 # constructa-schema
 
+## 2.2.0
+
+### Minor Changes
+
+- 658fc73: Add typed generator implementation, portable definition factory, generation context, and output inference contracts.
+
 ## 2.1.0
 
 ### Minor Changes
