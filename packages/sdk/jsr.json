@@ -1,14 +1,14 @@
 {
   "name": "@constructa/sdk",
-  "version": "0.0.22",
+  "version": "0.1.0",
   "exports": {
     ".": "./src/index.ts"
   },
   "imports": {
-    "constructa-core": "jsr:@constructa/core@^0.9.0",
-    "constructa-exporters": "jsr:@constructa/exporters@^0.0.1",
-    "constructa-generators": "jsr:@constructa/generators@^0.4.4",
-    "constructa-schema": "jsr:@constructa/schema@^2.4.0"
+    "constructa-core": "jsr:@constructa/core@^0.9.1",
+    "constructa-exporters": "jsr:@constructa/exporters@^0.0.2",
+    "constructa-generators": "jsr:@constructa/generators@^0.4.5",
+    "constructa-schema": "jsr:@constructa/schema@^2.4.1"
   },
   "publish": {
     "include": ["src", "README.md", "package.json"],

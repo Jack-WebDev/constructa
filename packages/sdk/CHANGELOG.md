@@ -1,5 +1,21 @@
 # constructa-sdk
 
+## 0.1.0
+
+### Minor Changes
+
+- 8cfd768: Improve JSR package documentation with runnable usage examples and complete
+  public API documentation. The SDK now provides the supported facade for the
+  core execution APIs and built-in generator factories.
+
+### Patch Changes
+
+- Updated dependencies [8cfd768]
+  - constructa-core@0.9.1
+  - constructa-schema@2.4.1
+  - constructa-generators@0.4.5
+  - constructa-exporters@0.0.2
+
 ## 0.0.22
 
 ### Patch Changes
