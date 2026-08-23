@@ -1,5 +1,12 @@
 # constructa-sdk
 
+## 0.0.15
+
+### Patch Changes
+
+- Updated dependencies [0f037da]
+  - constructa-generators@0.3.0
+
 ## 0.0.14
 
 ### Patch Changes
