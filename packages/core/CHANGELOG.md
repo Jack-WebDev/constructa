@@ -1,5 +1,11 @@
 # constructa-core
 
+## 0.3.0
+
+### Minor Changes
+
+- b650cdb: Add registry and immutable snapshot lookup with precise unknown-generator diagnostics.
+
 ## 0.2.0
 
 ### Minor Changes
