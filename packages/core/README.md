@@ -6,7 +6,7 @@ This package contains the core runtime responsible for registering, composing, a
 
 ## Responsibilities
 
-Planned areas include:
+Current APIs define trusted generator implementations, portable typed definitions, and engine-provided generation context services. Planned areas include:
 
 * Generator registry
 * Generator execution
@@ -14,6 +14,12 @@ Planned areas include:
 * Seeded randomness
 * Generator composition and lifecycle
 * Structured errors
+
+## Generator implementation contract
+
+Use `defineGenerator()` for developer-authored executable implementations. An implementation declares a stable lowercase `type`, positive integer `version`, definition validator, optional dependency analysis hook, and `generate({ definition, context })` function. Validation returns schema `ValidationIssue` objects without imposing a validation-library dependency.
+
+`GeneratorDefinition<Output>` carries output information only at compile time; emitted definitions remain plain JSON data. Factories should use `createGeneratorDefinition()` so literal fields are preserved and the resulting definition is portable. Implementations receive randomness and child generation through `GenerationContext`; they must not use global randomness or built-in-specific execution switches.
 
 ## Dependency Boundary
 

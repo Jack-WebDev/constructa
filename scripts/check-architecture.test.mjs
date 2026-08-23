@@ -122,4 +122,16 @@ describe("architecture boundary check", () => {
       ),
     ]);
   });
+
+  it("rejects global randomness in core generator code", async () => {
+    const rootDirectory = await createFixture({
+      coreSource: "export const random = Math.random();",
+    });
+
+    await expect(checkArchitecture(rootDirectory)).resolves.toEqual([
+      expect.stringContaining(
+        "constructa-core may not use Math.random(); use GenerationContext.random instead",
+      ),
+    ]);
+  });
 });

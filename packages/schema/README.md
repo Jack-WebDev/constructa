@@ -14,6 +14,8 @@ A `GeneratorDefinition` is executable generator data. It has a stable, non-empty
 { "type": "integer", "min": 1, "max": 100 }
 ```
 
+`GeneratorDefinition<Output>` can carry an output type for TypeScript inference. The type marker exists only at compile time and is never written into the serialized definition.
+
 A `GeneratorDocumentV1` wraps exactly one root definition and carries versioning and optional display metadata:
 
 ```json

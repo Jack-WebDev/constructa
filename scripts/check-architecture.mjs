@@ -42,6 +42,10 @@ const browserOnlyModulePrefixes = [
   "react-dom",
   "sonner",
 ];
+const globalRandomnessRestrictedPackages = new Set([
+  "constructa-core",
+  "constructa-generators",
+]);
 const dependencyFields = [
   "dependencies",
   "optionalDependencies",
@@ -290,6 +294,15 @@ async function checkSourceImports(workspacePackages, rootDirectory) {
     for (const filePath of sourceFiles) {
       const sourceText = await readFile(filePath, "utf8");
       const imports = collectModuleSpecifiers(sourceText, filePath);
+
+      if (
+        globalRandomnessRestrictedPackages.has(sourcePackage.name) &&
+        /\bMath\.random\s*\(/u.test(sourceText)
+      ) {
+        errors.push(
+          `${relative(rootDirectory, filePath)}: ${sourcePackage.name} may not use Math.random(); use GenerationContext.random instead`,
+        );
+      }
 
       for (const { line, specifier } of imports) {
         if (
