@@ -1,5 +1,12 @@
 # constructa-generators
 
+## 0.4.4
+
+### Patch Changes
+
+- Updated dependencies [f60a58b]
+  - constructa-core@0.9.0
+
 ## 0.4.3
 
 ### Patch Changes
