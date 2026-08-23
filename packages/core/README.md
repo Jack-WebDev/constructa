@@ -4,6 +4,32 @@ UI-agnostic generator registration and execution engine for Constructa.
 
 This package contains the core runtime responsible for registering, composing, and executing generators. It defines the fundamental behavior of the Constructa generation system without making assumptions about user interfaces, persistence, transport, or application environments.
 
+## Example
+
+Register the generator implementations your application needs, then execute a
+portable definition. A seed makes the result reproducible.
+
+```ts
+import {
+  createExecutor,
+  createRegistry,
+} from "jsr:@constructa/core";
+import {
+  registerIntegerGenerator,
+  registerObjectGenerator,
+} from "jsr:@constructa/generators";
+
+const registry = createRegistry();
+registerIntegerGenerator(registry);
+registerObjectGenerator(registry);
+
+const generate = createExecutor(registry);
+const result = generate.generate(
+  { type: "object", fields: { age: { type: "integer", min: 18, max: 65 } } },
+  { seed: "example" },
+);
+```
+
 ## Responsibilities
 
 Current APIs define trusted generator implementations, portable typed definitions, and engine-provided generation context services. Planned areas include:

@@ -1,10 +1,17 @@
+/** A JSON scalar value supported by Constructa documents. */
 export type JsonPrimitive = boolean | null | number | string;
+/** Any portable JSON value supported by Constructa documents. */
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
+/** A readonly array of portable JSON values. */
 export type JsonArray = readonly JsonValue[];
+/** A readonly string-keyed record of portable JSON values. */
 export type JsonObject = { readonly [key: string]: JsonValue };
 
+/** One property or array-index segment in a validation path. */
 export type ValidationPathSegment = string | number;
+/** The location of a validation issue inside a portable value. */
 export type ValidationPath = readonly ValidationPathSegment[];
+/** A stable, machine-readable validation failure. */
 export type ValidationIssue = {
   readonly code: string;
   readonly path: ValidationPath;
@@ -12,14 +19,17 @@ export type ValidationIssue = {
   readonly details?: JsonObject;
 };
 
+/** The supported categories for safe Constructa errors. */
 export const CONSTRUCTA_ERROR_KINDS = [
   "configuration",
   "dependency",
   "execution",
   "system",
 ] as const;
+/** A supported category for a safe Constructa error. */
 export type ConstructaErrorKind = (typeof CONSTRUCTA_ERROR_KINDS)[number];
 
+/** Error codes reserved by Constructa's public error contract. */
 export const RESERVED_CONSTRUCTA_ERROR_CODES = [
   "INVALID_RANGE",
   "EMPTY_CHOICE",
@@ -32,8 +42,10 @@ export const RESERVED_CONSTRUCTA_ERROR_CODES = [
   "INVALID_CONFIGURATION",
   "INVALID_JSON_VALUE",
 ] as const;
+/** An uppercase, stable error code. */
 export type ConstructaErrorCode = Uppercase<string>;
 
+/** Data used to construct a safe Constructa error. */
 export type ConstructaErrorOptions = {
   readonly kind: ConstructaErrorKind;
   readonly code: ConstructaErrorCode;
@@ -42,6 +54,7 @@ export type ConstructaErrorOptions = {
   readonly details?: JsonObject;
 };
 
+/** The serializable representation of a Constructa error. */
 export type SafeConstructaError = ConstructaErrorOptions;
 
 /** A safe, serializable error shared by every Constructa surface. */
@@ -86,12 +99,14 @@ export class ConstructaError extends TypeError {
   }
 }
 
+/** Creates a known safe error without retaining an underlying cause. */
 export function createConstructaError(
   options: ConstructaErrorOptions,
 ): ConstructaError {
   return new ConstructaError(options);
 }
 
+/** Returns a Constructa error, wrapping an unknown cause when necessary. */
 export function normalizeConstructaError(
   cause: unknown,
   options: ConstructaErrorOptions,
@@ -101,8 +116,11 @@ export function normalizeConstructaError(
     : new ConstructaError(options, cause);
 }
 
+/** The schema version emitted by this release. */
 export const CURRENT_SCHEMA_VERSION = 1;
+/** All document schema versions accepted by this release. */
 export const SUPPORTED_SCHEMA_VERSIONS = [CURRENT_SCHEMA_VERSION] as const;
+/** A supported document schema version. */
 export type SchemaVersion = (typeof SUPPORTED_SCHEMA_VERSIONS)[number];
 
 declare const generatorOutput: unique symbol;
@@ -116,6 +134,7 @@ export type GeneratorDefinition<Output = unknown> = JsonObject & {
   readonly [generatorOutput]?: Output;
 };
 
+/** Infers a generator definition's output type. */
 export type Infer<Definition> =
   Definition extends GeneratorDefinition<infer Output> ? Output : never;
 
@@ -127,6 +146,7 @@ export type GeneratorDocumentV1 = {
   readonly description?: string;
 };
 
+/** A document in any schema version currently supported by Constructa. */
 export type GeneratorDocument = GeneratorDocumentV1;
 
 /** An explicit one-step migration into a supported document schema version. */
@@ -136,6 +156,7 @@ export type DocumentMigration = {
   readonly migrate: (document: JsonObject) => unknown;
 };
 
+/** Reusable portable definitions for serialization and integration fixtures. */
 /** Reusable portable definitions for serialization and integration fixtures. */
 export const SERIALIZATION_DEFINITION_FIXTURES: readonly GeneratorDefinition[] =
   Object.freeze([
@@ -168,10 +189,10 @@ export const SERIALIZATION_DOCUMENT_FIXTURES: readonly GeneratorDocumentV1[] =
     }) as GeneratorDocumentV1,
   ]);
 
-/** A stable, lowercase identifier used to classify portable metadata. */
+/** A stable, lowercase identifier used by generator metadata. */
 export type SemanticMetadataId = string;
 
-/** A coarse output-preview classification, not an execution or inference type. */
+/** A coarse semantic category for a generator's output. */
 export type GeneratorOutputCategory = SemanticMetadataId;
 
 /**
@@ -188,6 +209,7 @@ export type GeneratorMetadata = {
   readonly examples?: readonly JsonValue[];
 };
 
+/** The allowed top-level keys of a versioned generator document. */
 export const GENERATOR_DOCUMENT_TOP_LEVEL_KEYS = [
   "schemaVersion",
   "name",
@@ -195,6 +217,7 @@ export const GENERATOR_DOCUMENT_TOP_LEVEL_KEYS = [
   "definition",
 ] as const;
 
+/** The allowed keys of portable generator metadata. */
 export const GENERATOR_METADATA_KEYS = [
   "typeId",
   "displayName",
@@ -217,9 +240,11 @@ const DOCUMENT_METADATA_KEYS = new Set([
   "timestamps",
 ]);
 
+/** Codes emitted when a document schema version cannot be accepted. */
 export type SchemaVersionFailureCode =
   | "schema_version_missing"
   | "schema_version_unsupported";
+/** Details of an unsupported or missing schema-version failure. */
 export type SchemaVersionFailure = {
   readonly code: SchemaVersionFailureCode;
   readonly message: string;
@@ -228,12 +253,14 @@ export type SchemaVersionFailure = {
   readonly details: { readonly supportedVersions: readonly SchemaVersion[] };
 } & ValidationIssue;
 
+/** Codes emitted while validating a generator definition. */
 export type GeneratorDefinitionFailureCode =
   | "generator_definition_not_json"
   | "generator_definition_not_object"
   | "generator_type_missing"
   | "generator_type_invalid"
   | "definition_document_metadata";
+/** Details of a generator-definition validation failure. */
 export type GeneratorDefinitionFailure = {
   readonly code: GeneratorDefinitionFailureCode;
   readonly message: string;
@@ -241,6 +268,7 @@ export type GeneratorDefinitionFailure = {
   readonly severity: "error";
 };
 
+/** Codes emitted while validating portable generator metadata. */
 export type GeneratorMetadataFailureCode =
   | "generator_metadata_not_json"
   | "generator_metadata_not_object"
@@ -252,6 +280,7 @@ export type GeneratorMetadataFailureCode =
   | "metadata_documentation_url_invalid"
   | "metadata_examples_invalid"
   | "metadata_property_unknown";
+/** Details of a generator-metadata validation failure. */
 export type GeneratorMetadataFailure = {
   readonly code: GeneratorMetadataFailureCode;
   readonly message: string;
@@ -259,6 +288,7 @@ export type GeneratorMetadataFailure = {
   readonly severity: "error";
 };
 
+/** Codes emitted while validating a versioned generator document. */
 export type GeneratorDocumentFailureCode =
   | SchemaVersionFailureCode
   | GeneratorDefinitionFailureCode
@@ -269,6 +299,7 @@ export type GeneratorDocumentFailureCode =
   | "description_invalid"
   | "top_level_property_unknown"
   | "configuration_envelope_removed";
+/** Details of a generator-document validation failure. */
 export type GeneratorDocumentFailure =
   | SchemaVersionFailure
   | {
@@ -280,10 +311,12 @@ export type GeneratorDocumentFailure =
       readonly path: ValidationPath;
       readonly severity: "error";
     };
+/** The success-or-failure result returned by `safeParseDocument`. */
 export type GeneratorDocumentParseResult =
   | { readonly success: true; readonly value: GeneratorDocumentV1 }
   | { readonly success: false; readonly failure: GeneratorDocumentFailure };
 
+/** Thrown when a value cannot be represented as portable JSON. */
 export class JsonValueError extends ConstructaError {
   readonly issue: ValidationIssue;
   constructor(path: ValidationPath, reason: string) {
@@ -299,6 +332,7 @@ export class JsonValueError extends ConstructaError {
   }
 }
 
+/** Thrown when a document's schema version is unsupported. */
 export class SchemaVersionError extends ConstructaError {
   readonly failure: SchemaVersionFailure;
   constructor(failure: SchemaVersionFailure) {
@@ -314,6 +348,7 @@ export class SchemaVersionError extends ConstructaError {
   }
 }
 
+/** Thrown when a generator definition is invalid. */
 export class GeneratorDefinitionError extends ConstructaError {
   readonly failure: GeneratorDefinitionFailure;
   constructor(failure: GeneratorDefinitionFailure) {
@@ -329,6 +364,7 @@ export class GeneratorDefinitionError extends ConstructaError {
   }
 }
 
+/** Thrown when portable generator metadata is invalid. */
 export class GeneratorMetadataError extends ConstructaError {
   readonly failure: GeneratorMetadataFailure;
   constructor(failure: GeneratorMetadataFailure) {
@@ -344,6 +380,7 @@ export class GeneratorMetadataError extends ConstructaError {
   }
 }
 
+/** Thrown when a versioned generator document is invalid. */
 export class GeneratorDocumentError extends ConstructaError {
   readonly failure: GeneratorDocumentFailure;
   constructor(failure: GeneratorDocumentFailure) {
@@ -359,25 +396,31 @@ export class GeneratorDocumentError extends ConstructaError {
   }
 }
 
+/** Returns whether a value is portable JSON. */
 export function isJsonValue(value: unknown): value is JsonValue {
   return validateJsonValue(value).length === 0;
 }
+/** Returns whether a value is a schema version supported by this release. */
 export function isSchemaVersion(value: unknown): value is SchemaVersion {
   return value === CURRENT_SCHEMA_VERSION;
 }
+/** Returns whether a value is a valid portable generator definition. */
 export function isGeneratorDefinition(
   value: unknown,
 ): value is GeneratorDefinition {
   return validateGeneratorDefinition(value).length === 0;
 }
+/** Returns whether a value is a valid current generator document. */
 export function isDocument(value: unknown): value is GeneratorDocumentV1 {
   return validateDocument(value).length === 0;
 }
+/** Returns whether a value is valid portable generator metadata. */
 export function isGeneratorMetadata(
   value: unknown,
 ): value is GeneratorMetadata {
   return validateGeneratorMetadata(value).length === 0;
 }
+/** Asserts that a value is portable JSON. */
 export function assertJsonValue(
   value: unknown,
   path: ValidationPath = [],
@@ -385,6 +428,7 @@ export function assertJsonValue(
   const [issue] = validateJsonValue(value, path);
   if (issue !== undefined) throw new JsonValueError(issue.path, issue.message);
 }
+/** Asserts that a value is a supported schema version. */
 export function assertSchemaVersion(
   value: unknown,
   path: ValidationPath = ["schemaVersion"],
@@ -392,6 +436,7 @@ export function assertSchemaVersion(
   const failure = findSchemaVersionValueFailure(value, path);
   if (failure !== undefined) throw new SchemaVersionError(failure);
 }
+/** Asserts that a value is a valid portable generator definition. */
 export function assertGeneratorDefinition(
   value: unknown,
   path: ValidationPath = [],
@@ -399,6 +444,7 @@ export function assertGeneratorDefinition(
   const [failure] = validateGeneratorDefinition(value, path);
   if (failure !== undefined) throw new GeneratorDefinitionError(failure);
 }
+/** Asserts that a value is valid portable generator metadata. */
 export function assertGeneratorMetadata(
   value: unknown,
   path: ValidationPath = [],
@@ -406,6 +452,7 @@ export function assertGeneratorMetadata(
   const [failure] = validateGeneratorMetadata(value, path);
   if (failure !== undefined) throw new GeneratorMetadataError(failure);
 }
+/** Asserts that a value is a valid current generator document. */
 export function assertDocument(
   value: unknown,
   path: ValidationPath = [],
@@ -413,6 +460,7 @@ export function assertDocument(
   const [issue] = validateDocument(value, path);
   if (issue !== undefined) throw new GeneratorDocumentError(issue);
 }
+/** Parses a document or throws its first validation failure. */
 export function parseDocument(
   value: unknown,
   path: ValidationPath = [],
@@ -420,6 +468,7 @@ export function parseDocument(
   const parser = resolveDocumentParser(value, path);
   return parser(value, path);
 }
+/** Validates a document without throwing. */
 export function safeParseDocument(
   value: unknown,
   path: ValidationPath = [],
@@ -566,6 +615,7 @@ function canonicalizeJson(value: JsonValue): JsonValue {
   return value;
 }
 
+/** Returns the validation issue when a value is not portable JSON. */
 export function validateJsonValue(
   value: unknown,
   path: ValidationPath = [],
@@ -671,6 +721,7 @@ export function validateGeneratorDefinition(
   collectDefinitionMetadataIssues(value as JsonObject, path, issues, true);
   return issues;
 }
+/** Returns metadata validation failures without throwing. */
 export function validateGeneratorMetadata(
   value: unknown,
   path: ValidationPath = [],
