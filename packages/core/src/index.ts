@@ -3,8 +3,12 @@ import {
   ConstructaError,
   type GeneratorDefinition,
   normalizeConstructaError,
+  parseDocument as parseSchemaDocument,
   type ValidationIssue,
   type ValidationPath,
+  type ValidationPathSegment,
+  validateDocument,
+  validateGeneratorDefinition,
 } from "constructa-schema";
 
 export type {
@@ -12,6 +16,7 @@ export type {
   Infer,
   ValidationIssue,
   ValidationPath,
+  ValidationPathSegment,
 } from "constructa-schema";
 
 /**
@@ -196,10 +201,148 @@ export function getSeededRandomMetadata(): SeededRandomMetadata {
 /** Services supplied by the engine. Implementations must not use global randomness. */
 export type GenerationContext = {
   readonly random: RandomSource;
-  readonly generateChild: <Output>(
+  /** The definition path currently being generated. */
+  readonly path: ValidationPath;
+  /**
+   * Delegates a typed child definition to the engine. Phase 017 supplies the
+   * implementation; contexts created before then fail explicitly.
+   */
+  readonly executeChild: <Output>(
     definition: GeneratorDefinition<Output>,
+    pathSegment: ValidationPathSegment,
   ) => Output;
 };
+
+export type GenerationContextOptions = {
+  readonly random: RandomSource;
+  readonly path?: ValidationPath;
+  readonly executeChild?: GenerationContext["executeChild"];
+};
+
+/**
+ * Creates the engine-owned capability view supplied to implementations.
+ * Application code normally receives this through `generate`, rather than
+ * constructing one directly.
+ */
+export function createGenerationContext(
+  options: GenerationContextOptions,
+): GenerationContext {
+  if (typeof options !== "object" || options === null) {
+    throw contextError(
+      "INVALID_GENERATION_CONTEXT",
+      [],
+      "Context options must be an object.",
+    );
+  }
+  assertContextPath(options.path ?? []);
+  if (
+    typeof options.executeChild !== "undefined" &&
+    typeof options.executeChild !== "function"
+  ) {
+    throw contextError(
+      "INVALID_GENERATION_CONTEXT",
+      [],
+      "executeChild must be a function when present.",
+    );
+  }
+
+  // This validates the Phase 012 source contract without drawing from it.
+  const random = createRandomSource(options.random);
+  const path = Object.freeze([...(options.path ?? [])]);
+  const executeChild =
+    options.executeChild ??
+    ((definition, pathSegment) => {
+      assertGeneratorDefinition(definition, [...path, pathSegment]);
+      assertContextPathSegment(pathSegment);
+      throw new ConstructaError({
+        kind: "execution",
+        code: "CHILD_EXECUTION_UNAVAILABLE",
+        path: [...path, pathSegment],
+        message: "Child execution is not available in this generation context.",
+      });
+    });
+
+  return Object.freeze({ random, path, executeChild });
+}
+
+export type ParseLimits = {
+  readonly maxDepth?: number;
+  readonly maxIssues?: number;
+  readonly maxNodes?: number;
+};
+
+export type ParseDefinitionOptions = {
+  readonly registry: Pick<
+    GeneratorRegistry | GeneratorRegistrySnapshot,
+    "lookup"
+  >;
+  readonly limits?: ParseLimits;
+};
+
+export type ParseDocumentOptions = ParseDefinitionOptions;
+
+export type DefinitionParseResult =
+  | { readonly success: true; readonly value: GeneratorDefinition }
+  | { readonly success: false; readonly issues: readonly ConstructaError[] };
+
+export type DocumentParseResult =
+  | {
+      readonly success: true;
+      readonly value: import("constructa-schema").GeneratorDocumentV1;
+    }
+  | { readonly success: false; readonly issues: readonly ConstructaError[] };
+
+/** Parses untrusted runtime definition data without executing generator code. */
+export function parseDefinition(
+  value: unknown,
+  options: ParseDefinitionOptions,
+): GeneratorDefinition {
+  const result = safeParseDefinition(value, options);
+  if (result.success) return result.value;
+  throw result.issues[0];
+}
+
+export function safeParseDefinition(
+  value: unknown,
+  options: ParseDefinitionOptions,
+): DefinitionParseResult {
+  return parseRuntimeDefinition(value, [], options);
+}
+
+/** Parses a versioned document and its root definition through the same pipeline. */
+export function parseDocument(
+  value: unknown,
+  options: ParseDocumentOptions,
+): import("constructa-schema").GeneratorDocumentV1 {
+  const result = safeParseDocument(value, options);
+  if (result.success) return result.value;
+  throw result.issues[0];
+}
+
+export function safeParseDocument(
+  value: unknown,
+  options: ParseDocumentOptions,
+): DocumentParseResult {
+  const limits = resolveParseLimits(options);
+  const documentIssues = validationIssuesToErrors(
+    validateDocumentSafely(value),
+    [],
+    limits.maxIssues,
+  );
+  if (documentIssues.length > 0)
+    return { success: false, issues: documentIssues };
+
+  // Schema parsing is now safe because validation has rejected hostile shapes.
+  const document = parseSchemaDocument(value);
+  const definition = parseRuntimeDefinition(
+    document.definition,
+    ["definition"],
+    options,
+  );
+  return definition.success
+    ? { success: true, value: document }
+    : { success: false, issues: definition.issues };
+}
 
 export type GeneratorDependency = {
   readonly typeId: string;
@@ -394,6 +537,337 @@ export function invokeGeneratorImplementation<
   }
 }
 
+const DEFAULT_PARSE_LIMITS = Object.freeze({
+  maxDepth: 64,
+  maxIssues: 100,
+  maxNodes: 10_000,
+});
+
+type ResolvedParseLimits = {
+  readonly maxDepth: number;
+  readonly maxIssues: number;
+  readonly maxNodes: number;
+};
+
+function parseRuntimeDefinition(
+  value: unknown,
+  path: ValidationPath,
+  options: ParseDefinitionOptions,
+): DefinitionParseResult {
+  const limits = resolveParseLimits(options);
+  const schemaIssues = validationIssuesToErrors(
+    validateDefinitionSafely(value, path),
+    path,
+    limits.maxIssues,
+  );
+  if (schemaIssues.length > 0) return { success: false, issues: schemaIssues };
+
+  const issues: ConstructaError[] = [];
+  const visited = new Set<object>();
+  visitRuntimeDefinition(
+    value as GeneratorDefinition,
+    path,
+    0,
+    options.registry,
+    limits,
+    visited,
+    issues,
+  );
+  return issues.length === 0
+    ? { success: true, value: value as GeneratorDefinition }
+    : { success: false, issues: Object.freeze(issues) };
+}
+
+function visitRuntimeDefinition(
+  definition: GeneratorDefinition,
+  path: ValidationPath,
+  depth: number,
+  registry: ParseDefinitionOptions["registry"],
+  limits: ResolvedParseLimits,
+  visited: Set<object>,
+  issues: ConstructaError[],
+): void {
+  if (issues.length >= limits.maxIssues) return;
+  if (depth > limits.maxDepth) {
+    addParseIssue(
+      issues,
+      limits,
+      "PARSE_DEPTH_LIMIT",
+      path,
+      "Generator definition exceeds the maximum nesting depth.",
+    );
+    return;
+  }
+  if (visited.size >= limits.maxNodes) {
+    addParseIssue(
+      issues,
+      limits,
+      "PARSE_NODE_LIMIT",
+      path,
+      "Generator definition exceeds the maximum node count.",
+    );
+    return;
+  }
+  visited.add(definition);
+
+  let implementation: GeneratorImplementation<GeneratorDefinition, unknown>;
+  try {
+    implementation = registry.lookup(definition.type, path);
+  } catch (cause) {
+    const error = normalizeConstructaError(cause, {
+      kind: "dependency",
+      code: "UNKNOWN_GENERATOR",
+      path: [...path, "type"],
+      message: "Generator type could not be resolved.",
+    });
+    addExistingParseIssue(issues, limits, error);
+    return;
+  }
+
+  let validationIssues: readonly ValidationIssue[];
+  try {
+    validationIssues = implementation.validateDefinition(definition);
+  } catch (cause) {
+    addExistingParseIssue(
+      issues,
+      limits,
+      normalizeConstructaError(cause, {
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path,
+        message: "Generator definition validation failed.",
+      }),
+    );
+    return;
+  }
+  if (!Array.isArray(validationIssues)) {
+    addParseIssue(
+      issues,
+      limits,
+      "INVALID_CONFIGURATION",
+      path,
+      "Generator definition validation returned an invalid result.",
+      "system",
+    );
+    return;
+  }
+  for (const issue of validationIssues) {
+    if (!isValidationIssue(issue)) {
+      addParseIssue(
+        issues,
+        limits,
+        "INVALID_CONFIGURATION",
+        path,
+        "Generator definition validation returned an invalid issue.",
+        "system",
+      );
+      return;
+    }
+    addParseIssue(
+      issues,
+      limits,
+      "INVALID_CONFIGURATION",
+      [...path, ...issue.path],
+      issue.message,
+    );
+  }
+
+  // Configurations are portable JSON. Every embedded object with a generator
+  // discriminator is another definition and must pass the same pipeline.
+  for (const [key, child] of Object.entries(definition)) {
+    if (key !== "type")
+      visitEmbeddedDefinitions(
+        child,
+        [...path, key],
+        depth + 1,
+        registry,
+        limits,
+        visited,
+        issues,
+      );
+    if (issues.length >= limits.maxIssues) return;
+  }
+}
+
+function visitEmbeddedDefinitions(
+  value: unknown,
+  path: ValidationPath,
+  depth: number,
+  registry: ParseDefinitionOptions["registry"],
+  limits: ResolvedParseLimits,
+  visited: Set<object>,
+  issues: ConstructaError[],
+): void {
+  if (
+    issues.length >= limits.maxIssues ||
+    value === null ||
+    typeof value !== "object"
+  )
+    return;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index += 1) {
+      visitEmbeddedDefinitions(
+        value[index],
+        [...path, index],
+        depth,
+        registry,
+        limits,
+        visited,
+        issues,
+      );
+      if (issues.length >= limits.maxIssues) return;
+    }
+    return;
+  }
+  if (Object.hasOwn(value, "type")) {
+    visitRuntimeDefinition(
+      value as GeneratorDefinition,
+      path,
+      depth,
+      registry,
+      limits,
+      visited,
+      issues,
+    );
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    visitEmbeddedDefinitions(
+      child,
+      [...path, key],
+      depth,
+      registry,
+      limits,
+      visited,
+      issues,
+    );
+    if (issues.length >= limits.maxIssues) return;
+  }
+}
+
+function resolveParseLimits(
+  options: ParseDefinitionOptions,
+): ResolvedParseLimits {
+  if (
+    typeof options !== "object" ||
+    options === null ||
+    typeof options.registry !== "object" ||
+    options.registry === null ||
+    typeof options.registry.lookup !== "function"
+  ) {
+    throw contextError(
+      "INVALID_PARSE_OPTIONS",
+      [],
+      "Parsing requires a registry with a lookup function.",
+    );
+  }
+  const supplied = options.limits ?? {};
+  const resolved = {
+    maxDepth: supplied.maxDepth ?? DEFAULT_PARSE_LIMITS.maxDepth,
+    maxIssues: supplied.maxIssues ?? DEFAULT_PARSE_LIMITS.maxIssues,
+    maxNodes: supplied.maxNodes ?? DEFAULT_PARSE_LIMITS.maxNodes,
+  };
+  for (const [name, value] of Object.entries(resolved)) {
+    if (!Number.isSafeInteger(value) || value < 1) {
+      throw contextError(
+        "INVALID_PARSE_LIMITS",
+        ["limits", name],
+        `${name} must be a positive safe integer.`,
+      );
+    }
+  }
+  return resolved;
+}
+
+function validateDefinitionSafely(
+  value: unknown,
+  path: ValidationPath,
+): readonly ValidationIssue[] {
+  try {
+    return validateGeneratorDefinition(value, path);
+  } catch (_cause) {
+    return [
+      {
+        code: "invalid_json_value",
+        path,
+        message: "Definition could not be safely inspected.",
+      },
+    ];
+  }
+}
+
+function validateDocumentSafely(value: unknown): readonly ValidationIssue[] {
+  try {
+    return validateDocument(value);
+  } catch {
+    return [
+      {
+        code: "invalid_json_value",
+        path: [],
+        message: "Document could not be safely inspected.",
+      },
+    ];
+  }
+}
+
+function validationIssuesToErrors(
+  issues: readonly ValidationIssue[],
+  fallbackPath: ValidationPath,
+  maxIssues = Number.POSITIVE_INFINITY,
+): ConstructaError[] {
+  return issues.slice(0, maxIssues).map(
+    (issue) =>
+      new ConstructaError({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: isValidationIssue(issue) ? issue.path : fallbackPath,
+        message: isValidationIssue(issue)
+          ? issue.message
+          : "Validation returned an invalid issue.",
+        details: isValidationIssue(issue)
+          ? { issueCode: issue.code }
+          : undefined,
+      }),
+  );
+}
+
+function isValidationIssue(value: unknown): value is ValidationIssue {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as ValidationIssue).code === "string" &&
+    typeof (value as ValidationIssue).message === "string" &&
+    Array.isArray((value as ValidationIssue).path)
+  );
+}
+
+function addParseIssue(
+  issues: ConstructaError[],
+  limits: ResolvedParseLimits,
+  code: string,
+  path: ValidationPath,
+  message: string,
+  kind: "configuration" | "system" = "configuration",
+): void {
+  if (issues.length < limits.maxIssues)
+    issues.push(
+      new ConstructaError({
+        kind,
+        code: code as Uppercase<string>,
+        path,
+        message,
+      }),
+    );
+}
+
+function addExistingParseIssue(
+  issues: ConstructaError[],
+  limits: ResolvedParseLimits,
+  error: ConstructaError,
+): void {
+  if (issues.length < limits.maxIssues) issues.push(error);
+}
+
 function assertGeneratorImplementation(implementation: {
   readonly type: string;
   readonly version: number;
@@ -539,6 +1013,38 @@ function invalidRandomSource(message: string): ConstructaError {
     kind: "system",
     code: "INVALID_RANDOM_SOURCE",
     path: ["random"],
+    message,
+  });
+}
+
+function assertContextPath(path: ValidationPath): void {
+  for (const segment of path) assertContextPathSegment(segment);
+}
+
+function assertContextPathSegment(
+  segment: unknown,
+): asserts segment is ValidationPathSegment {
+  if (
+    typeof segment !== "string" &&
+    (!Number.isSafeInteger(segment) || typeof segment !== "number")
+  ) {
+    throw contextError(
+      "INVALID_GENERATION_CONTEXT",
+      ["path"],
+      "Context path segments must be strings or safe integers.",
+    );
+  }
+}
+
+function contextError(
+  code: string,
+  path: ValidationPath,
+  message: string,
+): ConstructaError {
+  return new ConstructaError({
+    kind: "configuration",
+    code: code as Uppercase<string>,
+    path,
     message,
   });
 }

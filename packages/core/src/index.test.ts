@@ -1,7 +1,8 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
   createDefaultRandomSource,
+  createGenerationContext,
   createGeneratorDefinition,
   createRandomSource,
   createRegistry,
@@ -14,7 +15,10 @@ import {
   type Infer,
   invokeGeneratorImplementation,
   normalizeSeed,
+  parseDefinition,
+  parseDocument,
   type Seed,
+  safeParseDefinition,
 } from "./index";
 
 type IntegerDefinition<Minimum extends number = number> =
@@ -30,14 +34,14 @@ function integer<const Minimum extends number>(min: Minimum) {
   }) as IntegerDefinition<Minimum>;
 }
 
-const context: GenerationContext = {
+const context: GenerationContext = createGenerationContext({
   random: createRandomSource({
     float: () => 0.5,
     integer: () => 0,
     bytes: (length) => new Uint8Array(length),
   }),
-  generateChild: (definition) => definition as never,
-};
+  executeChild: (definition) => definition as never,
+});
 
 const integerImplementation: GeneratorImplementation<
   IntegerDefinition,
@@ -503,6 +507,135 @@ describe("generator registry", () => {
         kind: "configuration",
         code: "INVALID_CONFIGURATION",
         path: ["implementation"],
+      }),
+    );
+  });
+});
+
+describe("generation contexts", () => {
+  it("isolates path state and exposes no mutable engine state", () => {
+    const first = createGenerationContext({
+      random: createSeededRandom("first"),
+      path: ["definition"],
+    });
+    const second = createGenerationContext({
+      random: createSeededRandom("second"),
+    });
+
+    expect(first.path).toEqual(["definition"]);
+    expect(second.path).toEqual([]);
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Object.isFrozen(first.path)).toBe(true);
+    expect(() => first.executeChild({ type: "integer" }, "value")).toThrow(
+      expect.objectContaining({
+        kind: "execution",
+        code: "CHILD_EXECUTION_UNAVAILABLE",
+        path: ["definition", "value"],
+      }),
+    );
+  });
+
+  it("rejects invalid context paths before creating a capability", () => {
+    expect(() =>
+      createGenerationContext({
+        random: createSeededRandom("seed"),
+        path: [Number.NaN],
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: "INVALID_GENERATION_CONTEXT",
+        path: ["path"],
+      }),
+    );
+  });
+});
+
+describe("runtime parsing", () => {
+  const registry = createRegistry();
+  const generate = vi.fn(() => 1);
+  registry.register(
+    defineGenerator({
+      type: "integer",
+      version: 1,
+      validateDefinition(definition) {
+        return typeof (definition as { min?: unknown }).min === "number"
+          ? []
+          : [
+              {
+                code: "invalid_min",
+                path: ["min"],
+                message: "min must be a number",
+              },
+            ];
+      },
+      generate,
+    }),
+  );
+
+  it("validates registered definitions recursively without executing them", () => {
+    const definition = {
+      type: "integer",
+      min: 1,
+      child: { type: "integer", min: "bad" },
+    };
+    const result = safeParseDefinition(definition, { registry });
+
+    expect(result).toEqual({
+      success: false,
+      issues: [
+        expect.objectContaining({
+          kind: "configuration",
+          code: "INVALID_CONFIGURATION",
+          path: ["child", "min"],
+        }),
+      ],
+    });
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("uses root-relative paths for definitions and definition-relative paths for documents", () => {
+    expect(() => parseDefinition({ type: "missing" }, { registry })).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "UNKNOWN_GENERATOR",
+        path: ["type"],
+      }),
+    );
+    expect(() =>
+      parseDocument(
+        { schemaVersion: 1, definition: { type: "missing" } },
+        { registry },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "UNKNOWN_GENERATOR",
+        path: ["definition", "type"],
+      }),
+    );
+  });
+
+  it("bounds recursive parsing work", () => {
+    expect(() =>
+      parseDefinition(
+        {
+          type: "integer",
+          min: 1,
+          nested: {
+            type: "integer",
+            min: 1,
+            nested: { type: "integer", min: 1 },
+          },
+        },
+        {
+          registry,
+          limits: { maxDepth: 1 },
+        },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        code: "PARSE_DEPTH_LIMIT",
+        path: ["nested", "nested"],
       }),
     );
   });
