@@ -1,5 +1,11 @@
 # constructa-schema
 
+## 2.3.0
+
+### Minor Changes
+
+- 73d3c41: Add canonical definition and document serialization with reusable fixtures.
+
 ## 2.2.0
 
 ### Minor Changes
