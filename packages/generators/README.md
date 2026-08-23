@@ -12,6 +12,22 @@ The first implementation set will include integer, boolean, choice, decimal, str
 
 `boolean()` returns a portable definition whose output is inferred as `boolean`. It has no configuration and selects `false` and `true` with equal probability through the execution context's random source. `registerBooleanGenerator(registry)` is available for advanced custom registries.
 
+## Choice
+
+`choice(values)` accepts a non-empty array of portable JSON values and infers the union of its members, including array literals without `as const`. It selects a member through the execution context's unbiased integer source. `registerChoiceGenerator(registry)` is available for advanced custom registries.
+
+## Decimal
+
+`decimal({ min, max, precision })` returns a JavaScript `number` rounded with `Number#toFixed`; it is not arbitrary-precision decimal arithmetic. Bounds must be finite and inclusive. Precision is required and ranges from 0 through 15. `registerDecimalGenerator(registry)` is available for advanced custom registries.
+
+## String
+
+`string({ length, charset? })` returns a random character string. Length is required and ranges from 0 through 10,000. The explicit default charset is `alphanumeric`; `alphabetic`, `numeric`, `alphanumeric`, and `hex` are predefined, while any other non-empty string is used as a custom charset. `registerStringGenerator(registry)` is available for advanced custom registries.
+
+## Date
+
+`date({ min, max })` returns an inclusive `YYYY-MM-DD` ISO calendar-date string. Dates are validated canonically and generated with UTC calendar arithmetic, so results do not depend on the local timezone. `registerDateGenerator(registry)` is available for advanced custom registries.
+
 ## Dependency boundary
 
 This package may import `constructa-core` for the generator contract and registration APIs, and `constructa-schema` for portable definitions. It must not import exporters, the SDK, applications, UI, environment, persistence, or transport code.
