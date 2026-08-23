@@ -49,6 +49,80 @@ export type GeneratorImplementation<
   }) => Output;
 };
 
+export type RegisteredGenerator = {
+  readonly type: string;
+  readonly version: number;
+};
+
+export type GeneratorRegistrySnapshot = {
+  readonly generators: readonly RegisteredGenerator[];
+};
+
+export type GeneratorRegistry = {
+  register: <Definition extends GeneratorDefinition<Output>, Output>(
+    implementation: GeneratorImplementation<Definition, Output>,
+  ) => void;
+  replace: <Definition extends GeneratorDefinition<Output>, Output>(
+    implementation: GeneratorImplementation<Definition, Output>,
+  ) => void;
+  snapshot: () => GeneratorRegistrySnapshot;
+};
+
+const RESERVED_GENERATOR_TYPE_IDS = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
+
+/** Creates advanced registry infrastructure. Normal factories do not require it. */
+export function createRegistry(): GeneratorRegistry {
+  const implementations = new Map<
+    string,
+    GeneratorImplementation<GeneratorDefinition, unknown>
+  >();
+
+  return {
+    register(implementation) {
+      assertRegistryImplementation(implementation);
+      if (implementations.has(implementation.type)) {
+        throw registryError(
+          "DUPLICATE_GENERATOR",
+          ["type"],
+          `A generator with type "${implementation.type}" is already registered.`,
+        );
+      }
+      implementations.set(
+        implementation.type,
+        freezeImplementation(
+          implementation,
+        ) as unknown as GeneratorImplementation<GeneratorDefinition, unknown>,
+      );
+    },
+    replace(implementation) {
+      assertRegistryImplementation(implementation);
+      if (!implementations.has(implementation.type)) {
+        throw registryError(
+          "UNKNOWN_GENERATOR",
+          ["type"],
+          `No generator with type "${implementation.type}" is registered.`,
+        );
+      }
+      implementations.set(
+        implementation.type,
+        freezeImplementation(
+          implementation,
+        ) as unknown as GeneratorImplementation<GeneratorDefinition, unknown>,
+      );
+    },
+    snapshot() {
+      const generators = [...implementations.values()]
+        .map(({ type, version }) => Object.freeze({ type, version }))
+        .sort((left, right) => left.type.localeCompare(right.type));
+      return Object.freeze({ generators: Object.freeze(generators) });
+    },
+  };
+}
+
 /**
  * Defines a trusted, developer-authored generator implementation. This API has
  * no dependency on a particular validation library.
@@ -165,6 +239,48 @@ function assertGeneratorImplementation(implementation: {
   ) {
     throw new TypeError("analyzeDependencies must be a function when present");
   }
+}
+
+function assertRegistryImplementation(implementation: {
+  readonly type: string;
+  readonly version: number;
+  readonly validateDefinition: unknown;
+  readonly analyzeDependencies?: unknown;
+  readonly generate: unknown;
+}): void {
+  try {
+    assertGeneratorImplementation(implementation);
+  } catch {
+    throw registryError(
+      "INVALID_CONFIGURATION",
+      ["implementation"],
+      "Generator implementation is invalid.",
+    );
+  }
+  if (RESERVED_GENERATOR_TYPE_IDS.has(implementation.type)) {
+    throw registryError(
+      "INVALID_CONFIGURATION",
+      ["type"],
+      `Generator type "${implementation.type}" is reserved.`,
+    );
+  }
+}
+
+function freezeImplementation<
+  Definition extends GeneratorDefinition<Output>,
+  Output,
+>(
+  implementation: GeneratorImplementation<Definition, Output>,
+): GeneratorImplementation<Definition, Output> {
+  return Object.freeze({ ...implementation });
+}
+
+function registryError(
+  code: "DUPLICATE_GENERATOR" | "INVALID_CONFIGURATION" | "UNKNOWN_GENERATOR",
+  path: ValidationPath,
+  message: string,
+): ConstructaError {
+  return new ConstructaError({ kind: "configuration", code, path, message });
 }
 
 function isStableTypeId(value: string): boolean {
