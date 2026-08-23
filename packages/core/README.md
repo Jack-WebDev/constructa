@@ -23,7 +23,7 @@ Use `defineGenerator()` for developer-authored executable implementations. An im
 
 ## Runtime parsing
 
-Use `parseDefinition(value, { registry, limits? })` for untrusted runtime definition data, or `parseDocument(value, { registry, limits? })` for a versioned document. Both validate portable JSON, registered generator IDs, each implementation's configuration, and nested typed definitions without invoking `generate`. `safeParseDefinition()` and `safeParseDocument()` return all bounded, deterministic structured issues; the throwing forms return the first issue. Definitions parsed from dynamic data intentionally have broad `GeneratorDefinition` output typing.
+Use `parseDefinition(value, { registry, limits? })` for untrusted runtime definition data, or `parseDocument(value, { registry, limits? })` for a versioned document. Both validate portable JSON, registered generator IDs, each implementation's configuration, and nested typed definitions without invoking `generate`. `safeParseDefinition()` and `safeParseDocument()` return all bounded, deterministic structured issues; the throwing forms return the first issue. `limits` bounds byte size, recursion, nodes, object fields, array length, template source length, template references, and reported issues. Definitions parsed from dynamic data intentionally have broad `GeneratorDefinition` output typing.
 
 `parseTemplateTokens(source, { path? })` parses the MVP `{field}` and `{sibling.nested}` reference syntax into literal and reference tokens without resolving a value. Use `{{` and `}}` for literal braces. Empty paths, whitespace, braces inside a reference, and empty dot segments fail with `INVALID_TEMPLATE_TOKEN` at the supplied definition path.
 
@@ -39,7 +39,11 @@ Use `parseDefinition(value, { registry, limits? })` for untrusted runtime defini
 
 ## Single-value execution
 
-`createExecutor(registry)` is advanced infrastructure for executing one root definition. It snapshots the supplied registry, parses untrusted definitions, runs dependency analysis, and dispatches the resolved implementation. Its `generate(definition, options?)` method returns the definition's inferred output type. Supply either `{ seed }` for a fresh reproducible source or `{ random }` for a caller-owned injected source; supplying both is invalid. Definitions returned by `parseDefinition()` are recognized by the executor and are not validated again, while ordinary definitions are parsed once before dispatch. `maxDepth` bounds recursive child execution (default: 64). Bulk output is intentionally not part of this boundary.
+`createExecutor(registry)` is advanced infrastructure for executing one root definition. It snapshots the supplied registry, parses untrusted definitions, runs dependency analysis, and dispatches the resolved implementation. Its `generate(definition, options?)` method returns the definition's inferred output type. Supply either `{ seed }` for a fresh reproducible source or `{ random }` for a caller-owned injected source; supplying both is invalid. Definitions returned by `parseDefinition()` are recognized by the executor and are not validated again, while ordinary definitions are parsed once before dispatch. `maxDepth` bounds recursive child execution (default: 64); `signal` and an absolute UTC `deadline` stop execution before a subsequent dispatch. Bulk output is intentionally not part of this boundary.
+
+## Performance baseline
+
+Run `pnpm benchmark:core -- --iterations=10000` after building workspace packages to emit a JSON report for seeded primitive, composite, and reference execution. Reports include elapsed time and heap delta for comparison; they are measurements, not pass/fail thresholds.
 
 ## Dependency Boundary
 

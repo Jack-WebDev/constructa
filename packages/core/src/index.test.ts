@@ -2,6 +2,7 @@ import { ConstructaError } from "constructa-schema";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
+  createCompositeDependencyAnalysis,
   createDefaultRandomSource,
   createExecutor,
   createGenerationContext,
@@ -24,6 +25,7 @@ import {
   type RandomSource,
   type Seed,
   safeParseDefinition,
+  scheduleCompositeDependencies,
   type TemplateToken,
 } from "./index";
 
@@ -245,6 +247,24 @@ describe("template token parsing", () => {
         path: ["source"],
         message: expect.stringContaining(message),
       }),
+    );
+  });
+});
+
+describe("composite dependency limits", () => {
+  it("bounds graph nodes and validates graph limits", () => {
+    const analysis = createCompositeDependencyAnalysis([
+      { fieldPath: ["a"], dependencies: [] },
+      { fieldPath: ["b"], dependencies: [{ path: ["a"] }] },
+    ]);
+
+    expect(() =>
+      scheduleCompositeDependencies(analysis, { maxNodes: 1 }),
+    ).toThrow(expect.objectContaining({ code: "REFERENCE_GRAPH_NODE_LIMIT" }));
+    expect(() =>
+      scheduleCompositeDependencies(analysis, { maxEdges: 0 }),
+    ).toThrow(
+      expect.objectContaining({ code: "INVALID_COMPOSITE_DEPENDENCIES" }),
     );
   });
 });
@@ -691,6 +711,34 @@ describe("runtime parsing", () => {
       }),
     );
   });
+
+  it("rejects oversized untrusted inputs before implementation dispatch", () => {
+    expect(() =>
+      parseDefinition(
+        { type: "integer", min: 1 },
+        { registry, limits: { maxBytes: 1 } },
+      ),
+    ).toThrow(expect.objectContaining({ code: "PARSE_BYTE_LIMIT", path: [] }));
+    expect(() =>
+      parseDefinition(
+        { type: "integer", min: 1 },
+        { registry, limits: { maxObjectFields: 1 } },
+      ),
+    ).toThrow(
+      expect.objectContaining({ code: "PARSE_OBJECT_FIELD_LIMIT", path: [] }),
+    );
+    expect(() =>
+      parseDefinition(
+        { type: "integer", min: 1, values: [1, 2] },
+        { registry, limits: { maxArrayLength: 1 } },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        code: "PARSE_ARRAY_LIMIT",
+        path: ["values"],
+      }),
+    );
+  });
 });
 
 describe("single-value execution", () => {
@@ -834,6 +882,37 @@ describe("single-value execution", () => {
         path: ["dependency", "type"],
       }),
     );
+  });
+
+  it("stops before dispatch when aborted or past its deadline", () => {
+    const registry = createRegistry();
+    const generate = vi.fn(() => 1);
+    registry.register(
+      defineGenerator({
+        type: "cancellable",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        generate,
+      }),
+    );
+    const controller = new AbortController();
+    controller.abort();
+    const executor = createExecutor(registry);
+
+    expect(() =>
+      executor.generate({ type: "cancellable" }, { signal: controller.signal }),
+    ).toThrow(expect.objectContaining({ code: "EXECUTION_ABORTED", path: [] }));
+    expect(() =>
+      executor.generate({ type: "cancellable" }, { deadline: Date.now() - 1 }),
+    ).toThrow(
+      expect.objectContaining({
+        code: "EXECUTION_DEADLINE_EXCEEDED",
+        path: [],
+      }),
+    );
+    expect(generate).not.toHaveBeenCalled();
   });
 });
 
