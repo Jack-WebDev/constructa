@@ -1,7 +1,7 @@
 {
   "name": "constructa-exporters",
   "version": "0.0.3",
-  "description": "Output serializers and export formats for Constructa.",
+  "description": "Serializers and export formats for Constructa-generated data.",
   "private": false,
   "license": "MIT",
   "repository": {
