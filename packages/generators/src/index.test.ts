@@ -30,9 +30,13 @@ import {
   registerIntegerGenerator,
   registerObjectGenerator,
   registerStringGenerator,
+  registerTemplateGenerator,
   registerUuidGenerator,
   type StringDefinition,
   string,
+  type TemplateDefinition,
+  template,
+  templateGenerator,
   type UuidDefinition,
   uuid,
   uuidGenerator,
@@ -505,6 +509,106 @@ describe("object", () => {
       copy: "second",
       value: "second",
     });
+  });
+});
+
+describe("template", () => {
+  it("creates a portable string definition with exact output inference", () => {
+    const definition = template("Hello {name}");
+
+    expectTypeOf<Infer<typeof definition>>().toEqualTypeOf<string>();
+    expectTypeOf(definition).toEqualTypeOf<TemplateDefinition>();
+    expect(definition).toEqual({ type: "template", source: "Hello {name}" });
+    expect(JSON.parse(JSON.stringify(definition))).toEqual(definition);
+  });
+
+  it("interpolates scalar sibling values and reuses completed values", () => {
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    registerObjectGenerator(registry);
+    registerTemplateGenerator(registry);
+    const definition = object({
+      greeting: template(
+        "{name}, {name}! active={active}; score={score}; none={none}",
+      ),
+      name: choice(["Ada"]),
+      active: choice([true]),
+      score: choice([12.5]),
+      none: choice([null]),
+    });
+
+    expect(createExecutor(registry).generate(definition, { seed: 1 })).toEqual({
+      greeting: "Ada, Ada! active=true; score=12.5; none=null",
+      name: "Ada",
+      active: true,
+      score: 12.5,
+      none: null,
+    });
+  });
+
+  it("interpolates nested sibling values and literal braces", () => {
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    registerObjectGenerator(registry);
+    registry.register(templateGenerator);
+    const definition = object({
+      label: template("{{{address.city}}}"),
+      address: object({ city: choice(["Cape Town"]) }),
+    });
+
+    expect(createExecutor(registry).generate(definition, { seed: 1 })).toEqual({
+      label: "{Cape Town}",
+      address: { city: "Cape Town" },
+    });
+  });
+
+  it("rejects malformed syntax and expression-like references before execution", () => {
+    expect(() => template("{name.toLowerCase()}" as never)).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_TEMPLATE_TOKEN",
+        path: ["source"],
+      }),
+    );
+
+    const registry = createRegistry();
+    registry.register(templateGenerator);
+    expect(() =>
+      createExecutor(registry).generate(
+        { type: "template", source: "{name|lower}" },
+        { seed: 1 },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_TEMPLATE_TOKEN",
+        path: ["source"],
+      }),
+    );
+  });
+
+  it("rejects object and array values instead of coercing them", () => {
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    registerObjectGenerator(registry);
+    registerTemplateGenerator(registry);
+    const definition = object({
+      objectText: template("{address}"),
+      address: object({ city: choice(["Cape Town"]) }),
+      arrayText: template("{tags}"),
+      tags: array(choice(["admin"]), { length: 1 }),
+    });
+    registerArrayGenerator(registry);
+
+    expect(() =>
+      createExecutor(registry).generate(definition, { seed: 1 }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "NON_SCALAR_REFERENCE",
+        path: ["objectText"],
+      }),
+    );
   });
 });
 

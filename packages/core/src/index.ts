@@ -263,7 +263,7 @@ export type ParseTemplateTokensOptions = {
  *
  * `{field}` addresses a sibling and `{field.nested}` addresses a value below
  * that sibling. `{{` and `}}` emit literal braces. Whitespace, empty path
- * segments, and brace characters inside a reference are unsupported.
+ * segments, and expression characters inside a reference are unsupported.
  */
 export function parseTemplateTokens(
   source: string,
@@ -336,11 +336,13 @@ export function parseReferencePath(
   assertContextPath(path);
   const segments = source.split(".");
   if (
-    segments.some((segment) => segment.length === 0 || /[{}\s]/u.test(segment))
+    segments.some(
+      (segment) => segment.length === 0 || !/^[\p{L}\p{N}_$-]+$/u.test(segment),
+    )
   ) {
     throw templateTokenError(
       path,
-      "Template reference segments must be non-empty and cannot contain whitespace or braces.",
+      "Template reference segments must use letters, numbers, underscores, dollar signs, or hyphens.",
     );
   }
   return Object.freeze(segments);
@@ -1603,6 +1605,7 @@ function errorCodeForValidationIssue(code: string): Uppercase<string> {
     empty_choice: "EMPTY_CHOICE",
     invalid_length: "INVALID_LENGTH",
     invalid_range: "INVALID_RANGE",
+    invalid_template_token: "INVALID_TEMPLATE_TOKEN",
   };
   return reservedCodes[code] ?? "INVALID_CONFIGURATION";
 }
