@@ -19,7 +19,11 @@ Current APIs define trusted generator implementations, portable typed definition
 
 Use `defineGenerator()` for developer-authored executable implementations. An implementation declares a stable lowercase `type`, positive integer `version`, definition validator, optional dependency analysis hook, and `generate({ definition, context })` function. Validation returns schema `ValidationIssue` objects without imposing a validation-library dependency.
 
-`GeneratorDefinition<Output>` carries output information only at compile time; emitted definitions remain plain JSON data. Factories should use `createGeneratorDefinition()` so literal fields are preserved and the resulting definition is portable. Implementations receive randomness and child generation through `GenerationContext`; they must not use global randomness or built-in-specific execution switches.
+`GeneratorDefinition<Output>` carries output information only at compile time; emitted definitions remain plain JSON data. Factories should use `createGeneratorDefinition()` so literal fields are preserved and the resulting definition is portable. Implementations receive a frozen `GenerationContext` capability view: validated random draws, the current definition path, and typed `executeChild(definition, pathSegment)`. Child dispatch deliberately reports `CHILD_EXECUTION_UNAVAILABLE` until Phase 017 wires recursive execution; implementations must not use global randomness or built-in-specific execution switches.
+
+## Runtime parsing
+
+Use `parseDefinition(value, { registry, limits? })` for untrusted runtime definition data, or `parseDocument(value, { registry, limits? })` for a versioned document. Both validate portable JSON, registered generator IDs, each implementation's configuration, and nested typed definitions without invoking `generate`. `safeParseDefinition()` and `safeParseDocument()` return all bounded, deterministic structured issues; the throwing forms return the first issue. Definitions parsed from dynamic data intentionally have broad `GeneratorDefinition` output typing.
 
 ## Random sources
 
