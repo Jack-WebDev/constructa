@@ -28,6 +28,18 @@ The first implementation set will include integer, boolean, choice, decimal, str
 
 `date({ min, max })` returns an inclusive `YYYY-MM-DD` ISO calendar-date string. Dates are validated canonically and generated with UTC calendar arithmetic, so results do not depend on the local timezone. `registerDateGenerator(registry)` is available for advanced custom registries.
 
+## UUID
+
+`uuid()` returns a canonical UUID v4 string. It obtains exactly 16 bytes from the execution context, sets the RFC 4122 version and variant bits, and is deterministic when the executor is seeded. `registerUuidGenerator(registry)` is available for advanced custom registries.
+
+## Object
+
+`object(fields)` composes named child definitions and infers a mapped object output from them. Each child is delegated through the execution engine using its field name as the path segment, so nested errors retain their full field path. `registerObjectGenerator(registry)` is available for advanced custom registries.
+
+## Array
+
+`array(item, { length })` creates one fixed-length array value and infers `Infer<typeof item>[]`. Length must be a non-negative safe integer no greater than 10,000. Array items are delegated through the execution engine using numeric index path segments; this is distinct from repeated root execution. `registerArrayGenerator(registry)` is available for advanced custom registries.
+
 ## Dependency boundary
 
 This package may import `constructa-core` for the generator contract and registration APIs, and `constructa-schema` for portable definitions. It must not import exporters, the SDK, applications, UI, environment, persistence, or transport code.
