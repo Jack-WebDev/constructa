@@ -1,11 +1,11 @@
 {
   "name": "@constructa/core",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "exports": {
     ".": "./src/index.ts"
   },
   "imports": {
-    "constructa-schema": "jsr:@constructa/schema@^2.4.0"
+    "constructa-schema": "jsr:@constructa/schema@^2.4.1"
   },
   "publish": {
     "include": ["src", "README.md", "package.json"],
