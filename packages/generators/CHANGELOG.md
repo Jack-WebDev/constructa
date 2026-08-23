@@ -1,5 +1,16 @@
 # constructa-generators
 
+## 0.4.0
+
+### Minor Changes
+
+- 28495a9: Add scalar object-local template interpolation with stable malformed-token validation.
+
+### Patch Changes
+
+- Updated dependencies [28495a9]
+  - constructa-core@0.7.1
+
 ## 0.3.2
 
 ### Patch Changes
