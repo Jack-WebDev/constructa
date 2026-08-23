@@ -27,7 +27,21 @@ A `GeneratorDocumentV1` wraps exactly one root definition and carries versioning
 
 `name` and `description` are optional strings; empty strings are preserved rather than normalized. Unknown document keys are rejected. Document metadata, ownership, visibility, and timestamps do not belong in generator definitions. The former `{ type, configuration }` envelope is rejected; move its generator fields directly into `definition`.
 
-Use `parseDocument` to validate and obtain a `GeneratorDocumentV1`, or `safeParseDocument` and `findDocumentFailure` for structured failures. Use `isGeneratorDefinition` or `assertGeneratorDefinition` when validating an unwrapped definition.
+Use `parseDocument` to validate and obtain a `GeneratorDocumentV1`, or `safeParseDocument` for a non-throwing parse result. Use `isGeneratorDefinition` or `assertGeneratorDefinition` when validating an unwrapped definition.
+
+## Validation issues
+
+Validation APIs expose stable issues with a `code`, human-readable `message`, segment-based `path`, and optional JSON-safe `details`. A path is a `readonly (string | number)[]`: a property named `profile.age` remains the single segment `"profile.age"`, while an array item uses a numeric segment such as `0`.
+
+Use `validateDocument` to receive every independent document issue in deterministic order, or `validateGeneratorDefinition` for a definition and its nested typed definitions. `parseDocument` and `safeParseDocument` use the first issue when a single parse result is required. Path rendering is intentionally left to the consuming interface.
+
+## Semantic generator metadata
+
+`GeneratorMetadata` describes a generator without influencing execution. All fields are optional so third-party generators can provide only what they know: `typeId`, `displayName`, `description`, `category`, `outputCategory`, `documentationUrl`, and JSON-only `examples`.
+
+Metadata IDs use lowercase stable identifiers (for example, `integer`, `numeric`, or `date-time`). `outputCategory` is a coarse preview hint only; it does not replace runtime validation or future TypeScript output inference. Presentation details—including React components, icons, CSS classes, controls, routes, and layout—are deliberately not part of this contract.
+
+Use `isGeneratorMetadata`, `assertGeneratorMetadata`, or `validateGeneratorMetadata` to validate metadata.
 
 ## Dependency boundary
 

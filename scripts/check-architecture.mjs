@@ -26,6 +26,22 @@ const runtimeDependencyPolicy = Object.freeze({
 });
 
 const developmentOnlyDependencies = new Set(["@constructa/config"]);
+const uiRestrictedPackages = new Set([
+  "constructa-schema",
+  "constructa-core",
+  "constructa-generators",
+]);
+const browserOnlyModulePrefixes = [
+  "@constructa/ui",
+  "@radix-ui/",
+  "@tanstack/react-",
+  "@vitejs/",
+  "lucide-react",
+  "next",
+  "react",
+  "react-dom",
+  "sonner",
+];
 const dependencyFields = [
   "dependencies",
   "optionalDependencies",
@@ -72,6 +88,12 @@ function packageNameFromSpecifier(specifier, workspacePackageNames) {
   return workspacePackageNames.find(
     (packageName) =>
       specifier === packageName || specifier.startsWith(`${packageName}/`),
+  );
+}
+
+function isBrowserOnlyModule(specifier) {
+  return browserOnlyModulePrefixes.some(
+    (prefix) => specifier === prefix || specifier.startsWith(`${prefix}/`),
   );
 }
 
@@ -270,6 +292,16 @@ async function checkSourceImports(workspacePackages, rootDirectory) {
       const imports = collectModuleSpecifiers(sourceText, filePath);
 
       for (const { line, specifier } of imports) {
+        if (
+          uiRestrictedPackages.has(sourcePackage.name) &&
+          isBrowserOnlyModule(specifier)
+        ) {
+          errors.push(
+            `${relative(rootDirectory, filePath)}:${line}: ${sourcePackage.name} may not import browser or UI module "${specifier}"`,
+          );
+          continue;
+        }
+
         let importedPackage;
 
         if (specifier.startsWith(".")) {
