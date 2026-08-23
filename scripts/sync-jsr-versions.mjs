@@ -22,7 +22,11 @@ async function findWorkspacePackages() {
 
       try {
         const packageJson = await readJson(join(directory, "package.json"));
-        packages.push({ directory, packageJson });
+
+        packages.push({
+          directory,
+          packageJson,
+        });
       } catch (error) {
         if (error.code !== "ENOENT") {
           throw error;
@@ -34,10 +38,20 @@ async function findWorkspacePackages() {
   return packages;
 }
 
+const workspacePackages = await findWorkspacePackages();
+
+const versionsByPackageName = new Map(
+  workspacePackages.map(({ packageJson }) => [
+    packageJson.name,
+    packageJson.version,
+  ]),
+);
+
 let synchronizedCount = 0;
 
-for (const { directory, packageJson } of await findWorkspacePackages()) {
+for (const { directory, packageJson } of workspacePackages) {
   const jsrConfigPath = join(directory, "jsr.json");
+
   let jsrConfig;
 
   try {
@@ -54,13 +68,55 @@ for (const { directory, packageJson } of await findWorkspacePackages()) {
     throw new Error(`${packageJson.name} has jsr.json but is marked private`);
   }
 
-  if (jsrConfig.version === packageJson.version) {
+  let changed = false;
+
+  if (jsrConfig.version !== packageJson.version) {
+    jsrConfig.version = packageJson.version;
+    changed = true;
+  }
+
+  if (jsrConfig.imports) {
+    for (const [name, specifier] of Object.entries(jsrConfig.imports)) {
+      if (!specifier.startsWith("jsr:@constructa/")) {
+        continue;
+      }
+
+      const match = specifier.match(/^jsr:(@constructa\/[^@]+)@/);
+
+      if (!match) {
+        continue;
+      }
+
+      const dependencyName = match[1];
+
+      // JSR name -> npm workspace name
+      const npmPackageName = dependencyName.replace(
+        "@constructa/",
+        "constructa-",
+      );
+
+      const version = versionsByPackageName.get(npmPackageName);
+
+      if (!version) {
+        continue;
+      }
+
+      const nextSpecifier = `jsr:${dependencyName}@^${version}`;
+
+      if (specifier !== nextSpecifier) {
+        jsrConfig.imports[name] = nextSpecifier;
+        changed = true;
+      }
+    }
+  }
+
+  if (!changed) {
     continue;
   }
 
-  jsrConfig.version = packageJson.version;
   await writeFile(jsrConfigPath, `${JSON.stringify(jsrConfig, null, 2)}\n`);
+
   synchronizedCount += 1;
 }
 
-console.log(`Synchronized ${synchronizedCount} JSR package version(s).`);
+console.log(`Synchronized ${synchronizedCount} JSR package config(s).`);

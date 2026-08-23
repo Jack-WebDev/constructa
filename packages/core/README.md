@@ -23,7 +23,7 @@ Use `defineGenerator()` for developer-authored executable implementations. An im
 
 ## Registry
 
-`createRegistry()` is advanced infrastructure. Register trusted implementations explicitly with `register()`. Duplicate type IDs fail without changing registry state; `replace()` is the deliberate replacement path and requires the type to already be registered. `snapshot()` returns an immutable, type-sorted record of registered generator IDs and versions for execution infrastructure. Lookup and dispatch are separate later concerns.
+`createRegistry()` is advanced infrastructure. Register trusted implementations explicitly with `register()`. Duplicate type IDs fail without changing registry state; `replace()` is the deliberate replacement path and requires the type to already be registered. `lookup(type, path?)` resolves a registered implementation without a central built-in switch. Unknown IDs throw a dependency `UNKNOWN_GENERATOR` error at the supplied definition path plus `type`, with safe registered-type diagnostics. `snapshot()` returns an immutable, type-sorted registry view with the same lookup behavior; later registry changes do not affect it. Dispatch remains a separate concern.
 
 ## Dependency Boundary
 

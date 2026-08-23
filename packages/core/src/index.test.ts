@@ -217,6 +217,34 @@ describe("generator registry", () => {
     ]);
   });
 
+  it("resolves registered types through live and immutable snapshot lookups", () => {
+    const registry = createRegistry();
+    registry.register(implementation("integer", 1));
+    const snapshot = registry.snapshot();
+
+    expect(registry.lookup("integer").version).toBe(1);
+    expect(snapshot.lookup("integer").version).toBe(1);
+
+    registry.replace(implementation("integer", 2));
+    expect(registry.lookup("integer").version).toBe(2);
+    expect(snapshot.lookup("integer").version).toBe(1);
+  });
+
+  it("reports unknown generator types as precise dependency errors", () => {
+    const registry = createRegistry();
+    registry.register(implementation("boolean"));
+    registry.register(implementation("integer"));
+
+    expect(() => registry.lookup("missing", ["fields", "id"])).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "UNKNOWN_GENERATOR",
+        path: ["fields", "id", "type"],
+        details: { registeredTypes: ["boolean", "integer"] },
+      }),
+    );
+  });
+
   it("rejects duplicate and reserved IDs without changing registry state", () => {
     const registry = createRegistry();
     registry.register(implementation("integer"));
