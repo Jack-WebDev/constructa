@@ -1,5 +1,11 @@
 # constructa-generators
 
+## 0.2.0
+
+### Minor Changes
+
+- 5bdeb46: Add UUID v4, object, and fixed-length array generators.
+
 ## 0.1.0
 
 ### Minor Changes
