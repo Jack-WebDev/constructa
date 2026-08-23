@@ -1,12 +1,12 @@
 {
   "name": "@constructa/generators",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "exports": {
     ".": "./src/index.ts"
   },
   "imports": {
-    "constructa-core": "jsr:@constructa/core@^0.8.1",
-    "constructa-schema": "jsr:@constructa/schema@^2.3.0"
+    "constructa-core": "jsr:@constructa/core@^0.8.2",
+    "constructa-schema": "jsr:@constructa/schema@^2.4.0"
   },
   "publish": {
     "include": ["src", "README.md", "package.json"],

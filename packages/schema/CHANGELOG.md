@@ -1,5 +1,11 @@
 # constructa-schema
 
+## 2.4.0
+
+### Minor Changes
+
+- b7cddb6: Add version-dispatched document parsing and explicit document migrations.
+
 ## 2.3.0
 
 ### Minor Changes
