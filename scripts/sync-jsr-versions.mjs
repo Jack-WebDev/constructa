@@ -2,6 +2,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 const workspaceRoots = ["apps", "packages"];
+const isCheck = process.argv.includes("--check");
 
 async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
@@ -47,6 +48,29 @@ const versionsByPackageName = new Map(
   ]),
 );
 
+const jsrPackagesByNpmName = new Map(
+  (
+    await Promise.all(
+      workspacePackages.map(async ({ directory, packageJson }) => {
+        try {
+          return {
+            packageJson,
+            jsrConfig: await readJson(join(directory, "jsr.json")),
+          };
+        } catch (error) {
+          if (error.code === "ENOENT") {
+            return undefined;
+          }
+
+          throw error;
+        }
+      }),
+    )
+  )
+    .filter(Boolean)
+    .map(({ packageJson, jsrConfig }) => [packageJson.name, jsrConfig]),
+);
+
 let synchronizedCount = 0;
 
 for (const { directory, packageJson } of workspacePackages) {
@@ -75,38 +99,26 @@ for (const { directory, packageJson } of workspacePackages) {
     changed = true;
   }
 
-  if (jsrConfig.imports) {
-    for (const [name, specifier] of Object.entries(jsrConfig.imports)) {
-      if (!specifier.startsWith("jsr:@constructa/")) {
-        continue;
-      }
+  const workspaceDependencies = {
+    ...packageJson.dependencies,
+    ...packageJson.optionalDependencies,
+    ...packageJson.peerDependencies,
+  };
 
-      const match = specifier.match(/^jsr:(@constructa\/[^@]+)@/);
+  for (const dependencyName of Object.keys(workspaceDependencies)) {
+    const dependencyJsrConfig = jsrPackagesByNpmName.get(dependencyName);
+    const version = versionsByPackageName.get(dependencyName);
 
-      if (!match) {
-        continue;
-      }
+    if (!dependencyJsrConfig || !version) {
+      continue;
+    }
 
-      const dependencyName = match[1];
+    const nextSpecifier = `jsr:${dependencyJsrConfig.name}@^${version}`;
+    jsrConfig.imports ??= {};
 
-      // JSR name -> npm workspace name
-      const npmPackageName = dependencyName.replace(
-        "@constructa/",
-        "constructa-",
-      );
-
-      const version = versionsByPackageName.get(npmPackageName);
-
-      if (!version) {
-        continue;
-      }
-
-      const nextSpecifier = `jsr:${dependencyName}@^${version}`;
-
-      if (specifier !== nextSpecifier) {
-        jsrConfig.imports[name] = nextSpecifier;
-        changed = true;
-      }
+    if (jsrConfig.imports[dependencyName] !== nextSpecifier) {
+      jsrConfig.imports[dependencyName] = nextSpecifier;
+      changed = true;
     }
   }
 
@@ -114,9 +126,19 @@ for (const { directory, packageJson } of workspacePackages) {
     continue;
   }
 
-  await writeFile(jsrConfigPath, `${JSON.stringify(jsrConfig, null, 2)}\n`);
+  if (!isCheck) {
+    await writeFile(jsrConfigPath, `${JSON.stringify(jsrConfig, null, 2)}\n`);
+  }
 
   synchronizedCount += 1;
 }
 
-console.log(`Synchronized ${synchronizedCount} JSR package config(s).`);
+if (isCheck && synchronizedCount > 0) {
+  throw new Error(
+    `${synchronizedCount} JSR package config(s) need synchronization. Run node scripts/sync-jsr-versions.mjs.`,
+  );
+}
+
+console.log(
+  `${isCheck ? "Verified" : "Synchronized"} ${synchronizedCount} JSR package config(s).`,
+);

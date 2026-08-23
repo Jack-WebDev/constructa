@@ -13,8 +13,9 @@
     "build": "turbo run build",
     "check-types": "turbo run check-types",
     "dev:web": "turbo run dev -F web",
-    "check": "biome check . && pnpm run check:architecture",
+    "check": "biome check . && pnpm run check:architecture && pnpm run check:jsr",
     "check:architecture": "node scripts/check-architecture.mjs",
+    "check:jsr": "node scripts/sync-jsr-versions.mjs --check",
     "ci": "pnpm run check && pnpm run check-types && pnpm run test",
     "check:fix": "biome check --write .",
     "lint": "biome check --write .",
@@ -27,8 +28,8 @@
     "release:version": "pnpm run version-packages",
     "release:publish": "pnpm run build && changeset publish",
     "release:npm": "pnpm run build && changeset publish",
-    "release:jsr": "node scripts/publish-jsr.mjs",
-    "release:jsr:dry-run": "node scripts/publish-jsr.mjs --dry-run",
+    "release:jsr": "node scripts/sync-jsr-versions.mjs && node scripts/publish-jsr.mjs",
+    "release:jsr:dry-run": "node scripts/sync-jsr-versions.mjs && node scripts/publish-jsr.mjs --dry-run",
     "prepare": "husky"
   },
   "dependencies": {
