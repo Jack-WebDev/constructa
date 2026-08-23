@@ -45,6 +45,10 @@ export type ExecutionOptions = {
   readonly random?: RandomSource;
   /** Maximum child-definition nesting below the root. Defaults to 64. */
   readonly maxDepth?: number;
+  /** Stops execution before the next generator dispatch when aborted. */
+  readonly signal?: AbortSignal;
+  /** Stops execution before the next generator dispatch after this UTC epoch time. */
+  readonly deadline?: number;
 };
 
 export type Executor = {
@@ -379,6 +383,10 @@ export type CompositeDependencyAnalysis = {
 export type CompositeDependencySchedulingOptions = {
   /** Every reference path that exists in the containing object definition. */
   readonly referencePaths?: readonly ReferencePath[];
+  /** Maximum fields participating in one object-local reference graph. */
+  readonly maxNodes?: number;
+  /** Maximum unique field dependencies in one object-local reference graph. */
+  readonly maxEdges?: number;
 };
 
 /** The read-only capability supplied to generators that resolve references. */
@@ -540,6 +548,29 @@ export function scheduleCompositeDependencies(
   options: CompositeDependencySchedulingOptions = {},
 ): readonly string[] {
   const nodes = analysis.nodes;
+  const maxNodes = options.maxNodes ?? 10_000;
+  const maxEdges = options.maxEdges ?? 100_000;
+  if (
+    !Number.isSafeInteger(maxNodes) ||
+    maxNodes < 1 ||
+    !Number.isSafeInteger(maxEdges) ||
+    maxEdges < 1
+  ) {
+    throw contextError(
+      "INVALID_COMPOSITE_DEPENDENCIES",
+      [],
+      "Composite graph limits must be positive safe integers.",
+    );
+  }
+  if (nodes.length > maxNodes) {
+    throw new ConstructaError({
+      kind: "configuration",
+      code: "REFERENCE_GRAPH_NODE_LIMIT",
+      path: [],
+      message:
+        "Object reference graph exceeds the configured maximum field count.",
+    });
+  }
   const byName = new Map(nodes.map((node) => [node.fieldPath[0], node]));
   const referencePaths = new Set(
     (options.referencePaths ?? nodes.map((node) => node.fieldPath)).map(
@@ -548,6 +579,7 @@ export function scheduleCompositeDependencies(
   );
   const remaining = new Map<string, Set<string>>();
   const dependents = new Map<string, string[]>();
+  let edgeCount = 0;
 
   for (const node of nodes) {
     const dependencies = new Set<string>();
@@ -566,7 +598,19 @@ export function scheduleCompositeDependencies(
           details: { referencePath: [...dependency.path] },
         });
       }
-      dependencies.add(target);
+      if (!dependencies.has(target)) {
+        dependencies.add(target);
+        edgeCount += 1;
+      }
+      if (edgeCount > maxEdges) {
+        throw new ConstructaError({
+          kind: "configuration",
+          code: "REFERENCE_GRAPH_EDGE_LIMIT",
+          path: [...node.fieldPath],
+          message:
+            "Object reference graph exceeds the configured maximum dependency count.",
+        });
+      }
       const targets = dependents.get(target) ?? [];
       if (!targets.includes(node.fieldPath[0])) targets.push(node.fieldPath[0]);
       dependents.set(target, targets);
@@ -643,6 +687,16 @@ export type ParseLimits = {
   readonly maxDepth?: number;
   readonly maxIssues?: number;
   readonly maxNodes?: number;
+  /** Maximum UTF-8 encoded definition bytes. */
+  readonly maxBytes?: number;
+  /** Maximum properties in any input object record. */
+  readonly maxObjectFields?: number;
+  /** Maximum items in any input array. */
+  readonly maxArrayLength?: number;
+  /** Maximum template source length. */
+  readonly maxTemplateLength?: number;
+  /** Maximum parsed template references. */
+  readonly maxTemplateTokens?: number;
 };
 
 export type ParseDefinitionOptions = {
@@ -875,6 +929,8 @@ type ExecutionState = {
   readonly snapshot: GeneratorRegistrySnapshot;
   readonly random: RandomSource;
   readonly maxDepth: number;
+  readonly signal?: AbortSignal;
+  readonly deadline?: number;
 };
 
 function executeParsedDefinition(
@@ -884,6 +940,7 @@ function executeParsedDefinition(
   state: ExecutionState,
   references: ReferenceResolver = unavailableReferenceResolver(path),
 ): unknown {
+  assertExecutionActive(state, path);
   const implementation = state.snapshot.lookup(definition.type, path);
   analyzeGeneratorDependencies(
     implementation,
@@ -1102,13 +1159,57 @@ function resolveExecutionOptions(
       "maxDepth must be a non-negative safe integer.",
     );
   }
+  if (options.signal !== undefined && typeof options.signal !== "object") {
+    throw contextError(
+      "INVALID_EXECUTION_OPTIONS",
+      ["signal"],
+      "signal must be an AbortSignal when supplied.",
+    );
+  }
+  if (
+    options.deadline !== undefined &&
+    (!Number.isFinite(options.deadline) || options.deadline < 0)
+  ) {
+    throw contextError(
+      "INVALID_EXECUTION_OPTIONS",
+      ["deadline"],
+      "deadline must be a non-negative finite UTC epoch time.",
+    );
+  }
   const random =
     options.seed !== undefined
       ? createSeededRandom(options.seed)
       : options.random !== undefined
         ? createRandomSource(options.random)
         : createDefaultRandomSource();
-  return { random, maxDepth };
+  return {
+    random,
+    maxDepth,
+    signal: options.signal,
+    deadline: options.deadline,
+  };
+}
+
+function assertExecutionActive(
+  state: ExecutionState,
+  path: ValidationPath,
+): void {
+  if (state.signal?.aborted) {
+    throw new ConstructaError({
+      kind: "execution",
+      code: "EXECUTION_ABORTED",
+      path,
+      message: "Generator execution was aborted.",
+    });
+  }
+  if (state.deadline !== undefined && Date.now() >= state.deadline) {
+    throw new ConstructaError({
+      kind: "execution",
+      code: "EXECUTION_DEADLINE_EXCEEDED",
+      path,
+      message: "Generator execution exceeded its deadline.",
+    });
+  }
 }
 
 function analyzeGeneratorDependencies(
@@ -1352,12 +1453,22 @@ const DEFAULT_PARSE_LIMITS = Object.freeze({
   maxDepth: 64,
   maxIssues: 100,
   maxNodes: 10_000,
+  maxBytes: 1_000_000,
+  maxObjectFields: 10_000,
+  maxArrayLength: 10_000,
+  maxTemplateLength: 100_000,
+  maxTemplateTokens: 10_000,
 });
 
 type ResolvedParseLimits = {
   readonly maxDepth: number;
   readonly maxIssues: number;
   readonly maxNodes: number;
+  readonly maxBytes: number;
+  readonly maxObjectFields: number;
+  readonly maxArrayLength: number;
+  readonly maxTemplateLength: number;
+  readonly maxTemplateTokens: number;
 };
 
 function parseRuntimeDefinition(
@@ -1372,6 +1483,8 @@ function parseRuntimeDefinition(
     limits.maxIssues,
   );
   if (schemaIssues.length > 0) return { success: false, issues: schemaIssues };
+  const limitIssue = findInputLimitIssue(value, path, limits);
+  if (limitIssue !== undefined) return { success: false, issues: [limitIssue] };
 
   const issues: ConstructaError[] = [];
   const visited = new Set<object>();
@@ -1588,6 +1701,15 @@ function resolveParseLimits(
     maxDepth: supplied.maxDepth ?? DEFAULT_PARSE_LIMITS.maxDepth,
     maxIssues: supplied.maxIssues ?? DEFAULT_PARSE_LIMITS.maxIssues,
     maxNodes: supplied.maxNodes ?? DEFAULT_PARSE_LIMITS.maxNodes,
+    maxBytes: supplied.maxBytes ?? DEFAULT_PARSE_LIMITS.maxBytes,
+    maxObjectFields:
+      supplied.maxObjectFields ?? DEFAULT_PARSE_LIMITS.maxObjectFields,
+    maxArrayLength:
+      supplied.maxArrayLength ?? DEFAULT_PARSE_LIMITS.maxArrayLength,
+    maxTemplateLength:
+      supplied.maxTemplateLength ?? DEFAULT_PARSE_LIMITS.maxTemplateLength,
+    maxTemplateTokens:
+      supplied.maxTemplateTokens ?? DEFAULT_PARSE_LIMITS.maxTemplateTokens,
   };
   for (const [name, value] of Object.entries(resolved)) {
     if (!Number.isSafeInteger(value) || value < 1) {
@@ -1599,6 +1721,93 @@ function resolveParseLimits(
     }
   }
   return resolved;
+}
+
+function findInputLimitIssue(
+  value: unknown,
+  path: ValidationPath,
+  limits: ResolvedParseLimits,
+): ConstructaError | undefined {
+  const bytes = new TextEncoder().encode(JSON.stringify(value)).length;
+  if (bytes > limits.maxBytes) {
+    return inputLimitError(
+      "PARSE_BYTE_LIMIT",
+      path,
+      "Definition exceeds the maximum serialized byte size.",
+    );
+  }
+  const visit = (
+    candidate: unknown,
+    candidatePath: ValidationPath,
+  ): ConstructaError | undefined => {
+    if (Array.isArray(candidate)) {
+      if (candidate.length > limits.maxArrayLength) {
+        return inputLimitError(
+          "PARSE_ARRAY_LIMIT",
+          candidatePath,
+          "Definition contains an array exceeding the configured maximum length.",
+        );
+      }
+      for (let index = 0; index < candidate.length; index += 1) {
+        const issue = visit(candidate[index], [...candidatePath, index]);
+        if (issue !== undefined) return issue;
+      }
+      return undefined;
+    }
+    if (typeof candidate !== "object" || candidate === null) return undefined;
+    const record = candidate as Record<string, unknown>;
+    const keys = Object.keys(record);
+    if (keys.length > limits.maxObjectFields) {
+      return inputLimitError(
+        "PARSE_OBJECT_FIELD_LIMIT",
+        candidatePath,
+        "Definition contains an object exceeding the configured maximum field count.",
+      );
+    }
+    if (record.type === "template" && typeof record.source === "string") {
+      if (record.source.length > limits.maxTemplateLength) {
+        return inputLimitError(
+          "PARSE_TEMPLATE_LENGTH_LIMIT",
+          [...candidatePath, "source"],
+          "Template source exceeds the configured maximum length.",
+        );
+      }
+      let tokenCount = 0;
+      try {
+        tokenCount = parseTemplateTokens(record.source).filter(
+          (token) => token.type === "reference",
+        ).length;
+      } catch (_cause) {
+        // The owning template implementation reports malformed syntax.
+      }
+      if (tokenCount > limits.maxTemplateTokens) {
+        return inputLimitError(
+          "PARSE_TEMPLATE_TOKEN_LIMIT",
+          [...candidatePath, "source"],
+          "Template source exceeds the configured maximum reference count.",
+        );
+      }
+    }
+    for (const key of keys) {
+      const issue = visit(record[key], [...candidatePath, key]);
+      if (issue !== undefined) return issue;
+    }
+    return undefined;
+  };
+  return visit(value, path);
+}
+
+function inputLimitError(
+  code: string,
+  path: ValidationPath,
+  message: string,
+): ConstructaError {
+  return new ConstructaError({
+    kind: "configuration",
+    code: code as Uppercase<string>,
+    path,
+    message,
+  });
 }
 
 function validateDefinitionSafely(
