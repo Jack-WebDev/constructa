@@ -5,7 +5,8 @@
     ".": "./src/index.ts"
   },
   "imports": {
-    "constructa-core": "jsr:@constructa/core@^0.5.0"
+    "constructa-core": "jsr:@constructa/core@^0.5.0",
+    "constructa-schema": "jsr:@constructa/schema@^2.2.0"
   },
   "publish": {
     "include": ["src", "README.md", "package.json"],
