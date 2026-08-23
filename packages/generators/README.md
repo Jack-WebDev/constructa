@@ -34,7 +34,7 @@ The first implementation set will include integer, boolean, choice, decimal, str
 
 ## Object
 
-`object(fields)` composes named child definitions and infers a mapped object output from them. Each child is delegated through the execution engine using its field name as the path segment, so nested errors retain their full field path. `registerObjectGenerator(registry)` is available for advanced custom registries.
+`object(fields)` composes named child definitions and infers a mapped object output from them. Each child is delegated through the execution engine using its field name as the path segment, so nested errors retain their full field path. Template references are validated against the object's direct and nested fields before execution; independent fields use a stable name-based execution order while output preserves declaration order. `registerObjectGenerator(registry)` is available for advanced custom registries.
 
 ## Array
 

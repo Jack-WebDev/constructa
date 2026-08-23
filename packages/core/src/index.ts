@@ -376,6 +376,11 @@ export type CompositeDependencyAnalysis = {
   readonly nodes: readonly CompositeDependencyNode[];
 };
 
+export type CompositeDependencySchedulingOptions = {
+  /** Every reference path that exists in the containing object definition. */
+  readonly referencePaths?: readonly ReferencePath[];
+};
+
 /** The read-only capability supplied to generators that resolve references. */
 export type ReferenceResolver = {
   resolve: (path: ReferencePath) => unknown;
@@ -532,9 +537,15 @@ export function createCompositeDependencyAnalysis(
  */
 export function scheduleCompositeDependencies(
   analysis: CompositeDependencyAnalysis,
+  options: CompositeDependencySchedulingOptions = {},
 ): readonly string[] {
   const nodes = analysis.nodes;
   const byName = new Map(nodes.map((node) => [node.fieldPath[0], node]));
+  const referencePaths = new Set(
+    (options.referencePaths ?? nodes.map((node) => node.fieldPath)).map(
+      referencePathKey,
+    ),
+  );
   const remaining = new Map<string, Set<string>>();
   const dependents = new Map<string, string[]>();
 
@@ -542,17 +553,22 @@ export function scheduleCompositeDependencies(
     const dependencies = new Set<string>();
     for (const dependency of node.dependencies) {
       const target = dependency.path[0];
-      if (target === undefined || !byName.has(target)) {
+      if (
+        target === undefined ||
+        !byName.has(target) ||
+        !referencePaths.has(referencePathKey(dependency.path))
+      ) {
         throw new ConstructaError({
           kind: "dependency",
           code: "REFERENCE_NOT_FOUND",
           path: [...node.fieldPath],
-          message: "A referenced object field could not be found.",
+          message: "The referenced object value could not be found.",
+          details: { referencePath: [...dependency.path] },
         });
       }
       dependencies.add(target);
       const targets = dependents.get(target) ?? [];
-      targets.push(node.fieldPath[0]);
+      if (!targets.includes(node.fieldPath[0])) targets.push(node.fieldPath[0]);
       dependents.set(target, targets);
     }
     remaining.set(node.fieldPath[0], dependencies);
@@ -560,28 +576,67 @@ export function scheduleCompositeDependencies(
 
   const ready = nodes
     .filter((node) => (remaining.get(node.fieldPath[0])?.size ?? 0) === 0)
-    .map((node) => node.fieldPath[0]);
+    .map((node) => node.fieldPath[0])
+    .sort();
   const ordered: string[] = [];
   while (ready.length > 0) {
     const field = ready.shift();
     if (field === undefined) continue;
     ordered.push(field);
-    for (const dependent of dependents.get(field) ?? []) {
+    for (const dependent of (dependents.get(field) ?? []).sort()) {
       const dependencies = remaining.get(dependent);
       dependencies?.delete(field);
-      if (dependencies?.size === 0) ready.push(dependent);
+      if (dependencies?.size === 0) {
+        ready.push(dependent);
+        ready.sort();
+      }
     }
   }
   if (ordered.length !== nodes.length) {
-    const field = nodes.find((node) => !ordered.includes(node.fieldPath[0]));
+    const cycle = findCompositeDependencyCycle(remaining);
     throw new ConstructaError({
       kind: "dependency",
       code: "CIRCULAR_REFERENCE",
-      path: field?.fieldPath ?? [],
-      message: "Circular object value references were detected.",
+      path: cycle.slice(0, 1),
+      message: `Circular object value reference detected: ${cycle.join(" -> ")}.`,
+      details: { fields: cycle },
     });
   }
   return Object.freeze(ordered);
+}
+
+function findCompositeDependencyCycle(
+  remaining: ReadonlyMap<string, ReadonlySet<string>>,
+): string[] {
+  const visited = new Set<string>();
+  const active = new Set<string>();
+  const stack: string[] = [];
+  const visit = (field: string): string[] | undefined => {
+    visited.add(field);
+    active.add(field);
+    stack.push(field);
+    for (const dependency of [...(remaining.get(field) ?? [])].sort()) {
+      if (!remaining.has(dependency)) continue;
+      if (active.has(dependency)) {
+        const start = stack.indexOf(dependency);
+        return [...stack.slice(start), dependency];
+      }
+      if (!visited.has(dependency)) {
+        const cycle = visit(dependency);
+        if (cycle !== undefined) return cycle;
+      }
+    }
+    active.delete(field);
+    stack.pop();
+    return undefined;
+  };
+
+  for (const field of [...remaining.keys()].sort()) {
+    if (visited.has(field)) continue;
+    const cycle = visit(field);
+    if (cycle !== undefined) return cycle;
+  }
+  return [];
 }
 
 export type ParseLimits = {
