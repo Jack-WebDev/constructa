@@ -26,6 +26,30 @@ export type RandomSource = {
 
 export type RandomSourceAdapter = RandomSource;
 
+export type Seed = number | string;
+
+export const SEEDED_RANDOM_ALGORITHM = "mulberry32";
+export const SEEDED_RANDOM_ALGORITHM_VERSION = 1;
+
+export type SeededRandomMetadata = {
+  readonly algorithm: typeof SEEDED_RANDOM_ALGORITHM;
+  readonly version: typeof SEEDED_RANDOM_ALGORITHM_VERSION;
+};
+
+export type DeterminismCompatibility = {
+  readonly engineVersion: string;
+  readonly generatorImplementationVersion: number;
+  readonly random: SeededRandomMetadata;
+  readonly definition: GeneratorDefinition;
+  readonly seed: Seed;
+  readonly executionMode: string;
+};
+
+const SEEDED_RANDOM_METADATA: SeededRandomMetadata = Object.freeze({
+  algorithm: SEEDED_RANDOM_ALGORITHM,
+  version: SEEDED_RANDOM_ALGORITHM_VERSION,
+});
+
 /**
  * Validates an injected source and guards every produced value. No fallback
  * randomness is used when an adapter violates its contract.
@@ -59,7 +83,7 @@ export function createRandomSource(adapter: RandomSourceAdapter): RandomSource {
       return value;
     },
     bytes(length: number) {
-      assertRandomLength(length, "length");
+      assertByteLength(length);
       const value = adapter.bytes(length);
       if (!(value instanceof Uint8Array) || value.length !== length) {
         throw invalidRandomSource(
@@ -106,6 +130,67 @@ export function createDefaultRandomSource(): RandomSource {
     },
     bytes: randomBytes,
   });
+}
+
+/**
+ * Returns a canonical seed representation. Strings use UTF-8 exactly; finite
+ * numbers use their JavaScript numeric representation, with -0 normalized to 0.
+ */
+export function normalizeSeed(seed: Seed): string {
+  if (typeof seed === "string") return `string:${seed}`;
+  if (typeof seed === "number" && Number.isFinite(seed)) {
+    return `number:${Object.is(seed, -0) ? "0" : String(seed)}`;
+  }
+  throw new ConstructaError({
+    kind: "configuration",
+    code: "INVALID_SEED",
+    path: ["seed"],
+    message: "seed must be a string or finite number.",
+  });
+}
+
+/** Creates an isolated deterministic random source for the current algorithm version. */
+export function createSeededRandom(seed: Seed): RandomSource {
+  let state = hashSeed(normalizeSeed(seed));
+  const uint32 = () => {
+    state = (state + 0x6d2b_79f5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return (value ^ (value >>> 14)) >>> 0;
+  };
+  const uint53 = () => (uint32() & 0x1f_ffff) * 2 ** 32 + uint32();
+
+  return createRandomSource({
+    float() {
+      return uint53() / 2 ** 53;
+    },
+    integer(maxExclusive: number) {
+      const range = 2 ** 53;
+      const upperLimit = range - (range % maxExclusive);
+      let value = uint53();
+      while (value >= upperLimit) value = uint53();
+      return value % maxExclusive;
+    },
+    bytes(length: number) {
+      const bytes = new Uint8Array(length);
+      for (let index = 0; index < length; index += 1) {
+        if (index % 4 === 0) {
+          const value = uint32();
+          bytes[index] = value & 0xff;
+          if (index + 1 < length) bytes[index + 1] = (value >>> 8) & 0xff;
+          if (index + 2 < length) bytes[index + 2] = (value >>> 16) & 0xff;
+          if (index + 3 < length) bytes[index + 3] = value >>> 24;
+        }
+      }
+      return bytes;
+    },
+  });
+}
+
+/** Metadata for reproducibility diagnostics. It intentionally contains no seed. */
+export function getSeededRandomMetadata(): SeededRandomMetadata {
+  return SEEDED_RANDOM_METADATA;
 }
 
 /** Services supplied by the engine. Implementations must not use global randomness. */
@@ -443,6 +528,12 @@ function assertRandomLength(value: number, name: string): void {
   }
 }
 
+function assertByteLength(length: number): void {
+  if (!Number.isSafeInteger(length) || length < 0) {
+    throw invalidRandomSource("length must be a non-negative safe integer.");
+  }
+}
+
 function invalidRandomSource(message: string): ConstructaError {
   return new ConstructaError({
     kind: "system",
@@ -450,6 +541,14 @@ function invalidRandomSource(message: string): ConstructaError {
     path: ["random"],
     message,
   });
+}
+
+function hashSeed(seed: string): number {
+  let hash = 0x811c_9dc5;
+  for (const byte of new TextEncoder().encode(seed)) {
+    hash = Math.imul(hash ^ byte, 0x0100_0193) >>> 0;
+  }
+  return hash;
 }
 
 function isStableTypeId(value: string): boolean {
