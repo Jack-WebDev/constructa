@@ -35,6 +35,10 @@ Use `parseDefinition(value, { registry, limits? })` for untrusted runtime defini
 
 `createRegistry()` is advanced infrastructure. Register trusted implementations explicitly with `register()`. Duplicate type IDs fail without changing registry state; `replace()` is the deliberate replacement path and requires the type to already be registered. `lookup(type, path?)` resolves a registered implementation without a central built-in switch. Unknown IDs throw a dependency `UNKNOWN_GENERATOR` error at the supplied definition path plus `type`, with safe registered-type diagnostics. `snapshot()` returns an immutable, type-sorted registry view with the same lookup behavior; later registry changes do not affect it. Dispatch remains a separate concern.
 
+## Single-value execution
+
+`createExecutor(registry)` is advanced infrastructure for executing one root definition. It snapshots the supplied registry, parses untrusted definitions, runs dependency analysis, and dispatches the resolved implementation. Its `generate(definition, options?)` method returns the definition's inferred output type. Supply either `{ seed }` for a fresh reproducible source or `{ random }` for a caller-owned injected source; supplying both is invalid. Definitions returned by `parseDefinition()` are recognized by the executor and are not validated again, while ordinary definitions are parsed once before dispatch. Child execution and bulk output are intentionally not part of this boundary.
+
 ## Dependency Boundary
 
 `constructa-schema` is the only Constructa runtime dependency that `constructa-core` may depend on.
