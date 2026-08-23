@@ -56,6 +56,8 @@ if (releaseTag) {
   }
 }
 
+selectedPackages = orderPackagesByJsrDependencies(selectedPackages);
+
 let processedCount = 0;
 
 for (const { directory, packageJson, jsrConfig } of selectedPackages) {
@@ -123,4 +125,65 @@ function isJsrVersionPublished(jsrConfig) {
   );
 
   return result.status === 0;
+}
+
+/**
+ * Publishes local JSR dependencies before their dependents. Changesets updates
+ * version ranges before this script runs, so filesystem ordering is not enough:
+ * JSR must be able to resolve each updated dependency at publish time.
+ */
+function orderPackagesByJsrDependencies(packages) {
+  const packagesByJsrName = new Map(
+    packages.map((workspacePackage) => [
+      workspacePackage.jsrConfig.name,
+      workspacePackage,
+    ]),
+  );
+  const states = new Map();
+  const ordered = [];
+
+  const visit = (workspacePackage, trail = []) => {
+    const packageName = workspacePackage.jsrConfig.name;
+    const state = states.get(packageName);
+
+    if (state === "visited") return;
+    if (state === "visiting") {
+      throw new Error(
+        `Circular local JSR dependency: ${[...trail, packageName].join(" -> ")}`,
+      );
+    }
+
+    states.set(packageName, "visiting");
+    for (const specifier of Object.values(
+      workspacePackage.jsrConfig.imports ?? {},
+    )) {
+      const dependencyName = getJsrPackageName(specifier);
+      const dependency =
+        dependencyName === undefined
+          ? undefined
+          : packagesByJsrName.get(dependencyName);
+      if (dependency !== undefined) {
+        visit(dependency, [...trail, packageName]);
+      }
+    }
+    states.set(packageName, "visited");
+    ordered.push(workspacePackage);
+  };
+
+  for (const workspacePackage of packages) {
+    visit(workspacePackage);
+  }
+
+  return ordered;
+}
+
+function getJsrPackageName(specifier) {
+  if (typeof specifier !== "string" || !specifier.startsWith("jsr:")) {
+    return undefined;
+  }
+
+  const versionSeparator = specifier.lastIndexOf("@");
+  return versionSeparator <= 4
+    ? undefined
+    : specifier.slice(4, versionSeparator);
 }
