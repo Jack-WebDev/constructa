@@ -1,5 +1,11 @@
 # constructa-core
 
+## 0.2.0
+
+### Minor Changes
+
+- 68a9ee6: Add advanced generator registry registration, explicit replacement, and immutable execution snapshots.
+
 ## 0.1.0
 
 ### Minor Changes
