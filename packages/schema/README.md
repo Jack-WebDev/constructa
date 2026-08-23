@@ -1,46 +1,34 @@
 # `constructa-schema`
 
-Portable generator definitions, validation schemas, and related types shared by every Constructa interface.
-
-Planned areas include definition versioning, primitive and composite definitions, validation results, and safe serialization. This package must remain independent of execution, UI, network, and persistence concerns.
+Portable generator definitions, versioned generator documents, validation schemas, and related types shared by every Constructa interface.
 
 ## Portable data constraint
 
-Portable generator definitions are JSON-only data. Supported values are strings, booleans, `null`, finite numbers other than negative zero, arrays, and plain object records whose properties are all JSON values.
+Documents and definitions are JSON-only data. Supported values are strings, booleans, `null`, finite numbers other than negative zero, arrays, and plain object records whose properties are all JSON values. Functions, symbols, bigints, `NaN`, infinities, cyclic objects, sparse arrays, custom `toJSON` behavior, class instances, maps, sets, dates, accessors, symbol keys, and non-enumerable properties are rejected.
 
-Omit optional data by leaving the property out. `undefined` is not a portable value, including in object properties or array items. Values that JSON would coerce, execute, or silently omit are rejected, including functions, symbols, bigints, `NaN`, infinities, cyclic objects, sparse arrays, custom `toJSON` behavior, class instances, maps, sets, dates, accessors, symbol keys, and non-enumerable properties.
+## Definitions and documents
 
-Use `isJsonValue`, `assertJsonValue`, or `findJsonValueError` to enforce this constraint before later schema-specific validation.
+A `GeneratorDefinition` is executable generator data. It has a stable, non-empty `type` discriminator, with generator-specific fields at the same level:
 
-## Schema version
+```json
+{ "type": "integer", "min": 1, "max": 100 }
+```
 
-Complete portable definitions must include `schemaVersion: 1`. `CURRENT_SCHEMA_VERSION` identifies the version emitted by current Constructa tooling, and `SUPPORTED_SCHEMA_VERSIONS` lists the versions accepted by this package.
-
-Use `isSchemaVersion`, `assertSchemaVersion`, `isVersionedDefinition`, `assertVersionedDefinition`, `findSchemaVersionValueFailure`, or `findSchemaVersionFailure` to reject missing or unsupported version markers with structured failures.
-
-## Definition envelope
-
-The canonical top-level generator definition document is:
+A `GeneratorDocumentV1` wraps exactly one root definition and carries versioning and optional display metadata:
 
 ```json
 {
   "schemaVersion": 1,
-  "type": "integer",
-  "configuration": {
-    "min": 1,
-    "max": 100
-  },
   "name": "Small integer",
-  "description": "An integer in a bounded range."
+  "description": "An integer in a bounded range.",
+  "definition": { "type": "integer", "min": 1, "max": 100 }
 }
 ```
 
-`schemaVersion`, `type`, and `configuration` are required. `type` must be a non-empty string, and `configuration` must be a JSON object. `name` and `description` are optional strings.
+`name` and `description` are optional strings; empty strings are preserved rather than normalized. Unknown document keys are rejected. Document metadata, ownership, visibility, and timestamps do not belong in generator definitions. The former `{ type, configuration }` envelope is rejected; move its generator fields directly into `definition`.
 
-Unknown top-level properties are rejected so all surfaces exchange one canonical document shape. Generator-specific data belongs inside `configuration`, where each generator can validate its own fields in later phases.
-
-Use `isDefinitionEnvelope`, `assertDefinitionEnvelope`, `parseDefinitionEnvelope`, `safeParseDefinitionEnvelope`, or `findDefinitionEnvelopeFailure` to validate the complete envelope.
+Use `parseDocument` to validate and obtain a `GeneratorDocumentV1`, or `safeParseDocument` and `findDocumentFailure` for structured failures. Use `isGeneratorDefinition` or `assertGeneratorDefinition` when validating an unwrapped definition.
 
 ## Dependency boundary
 
-This is the bottom of the domain dependency graph and has no Constructa runtime dependencies. In particular, it must not import core, generators, exporters, the SDK, applications, UI, environment, persistence, or transport code.
+This is the bottom of the domain dependency graph and has no Constructa runtime dependencies.
