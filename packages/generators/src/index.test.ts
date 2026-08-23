@@ -2,6 +2,8 @@ import { createExecutor, createRegistry, type Infer } from "constructa-core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
+  array,
+  arrayGenerator,
   type BooleanDefinition,
   boolean,
   booleanGenerator,
@@ -13,14 +15,21 @@ import {
   type IntegerDefinition,
   integer,
   integerGenerator,
+  object,
+  registerArrayGenerator,
   registerBooleanGenerator,
   registerChoiceGenerator,
   registerDateGenerator,
   registerDecimalGenerator,
   registerIntegerGenerator,
+  registerObjectGenerator,
   registerStringGenerator,
+  registerUuidGenerator,
   type StringDefinition,
   string,
+  type UuidDefinition,
+  uuid,
+  uuidGenerator,
 } from "./index";
 
 describe("integer", () => {
@@ -302,5 +311,176 @@ describe("seeded primitive generation", () => {
         executor.generate(definition, { seed: "repeatable" }),
       );
     }
+  });
+});
+
+describe("uuid", () => {
+  it("maps random bytes into a canonical UUID version 4", () => {
+    const registry = createRegistry();
+    registerUuidGenerator(registry);
+    const bytes = Uint8Array.from({ length: 16 }, (_, index) => index);
+
+    const definition = uuid();
+    expectTypeOf<Infer<typeof definition>>().toEqualTypeOf<string>();
+    expectTypeOf(definition).toEqualTypeOf<UuidDefinition>();
+    expect(
+      createExecutor(registry).generate(definition, {
+        random: {
+          float: () => 0,
+          integer: () => 0,
+          bytes: () => bytes,
+        },
+      }),
+    ).toBe("00010203-0405-4607-8809-0a0b0c0d0e0f");
+  });
+
+  it("is deterministic for a seed and rejects unsupported options", () => {
+    const registry = createRegistry();
+    registry.register(uuidGenerator);
+    const executor = createExecutor(registry);
+
+    expect(executor.generate(uuid(), { seed: "fixture" })).toBe(
+      executor.generate(uuid(), { seed: "fixture" }),
+    );
+    expect(() =>
+      executor.generate({ type: "uuid", version: 2 }, { seed: 1 }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: ["version"],
+      }),
+    );
+  });
+});
+
+describe("object", () => {
+  it("infers mapped fields and delegates each field with its name as the path", () => {
+    const registry = createRegistry();
+    registerIntegerGenerator(registry);
+    registerChoiceGenerator(registry);
+    registerObjectGenerator(registry);
+    const definition = object({
+      id: integer({ min: 1, max: 1 }),
+      role: choice(["admin", "member"]),
+    });
+
+    expectTypeOf<Infer<typeof definition>>().toEqualTypeOf<{
+      readonly id: number;
+      readonly role: "admin" | "member";
+    }>();
+    expect(
+      createExecutor(registry).generate(definition, {
+        random: {
+          float: () => 0,
+          integer: () => 0,
+          bytes: (length) => new Uint8Array(length),
+        },
+      }),
+    ).toEqual({ id: 1, role: "admin" });
+  });
+
+  it("supports recursive nesting and reports nested field paths", () => {
+    const registry = createRegistry();
+    registerIntegerGenerator(registry);
+    registerObjectGenerator(registry);
+    const nested = object({
+      address: object({ zip: integer({ min: 1, max: 1 }) }),
+    });
+
+    expect(createExecutor(registry).generate(nested, { seed: 1 })).toEqual({
+      address: { zip: 1 },
+    });
+    expect(() =>
+      createExecutor(registry).generate(
+        {
+          type: "object",
+          fields: {
+            address: { type: "object", fields: { zip: { type: "missing" } } },
+          },
+        },
+        { seed: 1 },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "UNKNOWN_GENERATOR",
+        path: ["fields", "address", "fields", "zip", "type"],
+      }),
+    );
+  });
+
+  it("uses the executor depth limit for nested child execution", () => {
+    const registry = createRegistry();
+    registerIntegerGenerator(registry);
+    registerObjectGenerator(registry);
+    const definition = object({
+      child: object({ value: integer({ min: 1, max: 1 }) }),
+    });
+
+    expect(() =>
+      createExecutor(registry).generate(definition, { seed: 1, maxDepth: 1 }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "execution",
+        code: "MAX_EXECUTION_DEPTH",
+        path: ["child", "value"],
+      }),
+    );
+  });
+});
+
+describe("array", () => {
+  it("infers item arrays and delegates children with numeric indexes", () => {
+    const registry = createRegistry();
+    registerIntegerGenerator(registry);
+    registerObjectGenerator(registry);
+    registerArrayGenerator(registry);
+    const definition = array(object({ value: integer({ min: 2, max: 2 }) }), {
+      length: 2,
+    });
+
+    expectTypeOf<Infer<typeof definition>>().toEqualTypeOf<
+      { readonly value: number }[]
+    >();
+    expect(createExecutor(registry).generate(definition, { seed: 1 })).toEqual([
+      { value: 2 },
+      { value: 2 },
+    ]);
+  });
+
+  it("does not execute a child for an empty array", () => {
+    const registry = createRegistry();
+    registerIntegerGenerator(registry);
+    registry.register(arrayGenerator);
+    const definition = array(integer({ min: 0, max: 1 }), { length: 0 });
+
+    expect(
+      createExecutor(registry).generate(definition, {
+        random: {
+          float: () => 0,
+          integer: () => {
+            throw new Error("child should not execute");
+          },
+          bytes: (length) => new Uint8Array(length),
+        },
+      }),
+    ).toEqual([]);
+  });
+
+  it.each([
+    [{ length: -1 }, ["length"]],
+    [{ length: 10_001 }, ["length"]],
+    [{ length: 1.5 }, ["length"]],
+    [{ length: 1, count: 2 }, ["count"]],
+  ])("rejects invalid array options", (options, path) => {
+    expect(() => array(integer({ min: 0, max: 1 }), options as never)).toThrow(
+      expect.objectContaining({
+        code: Object.hasOwn(options, "count")
+          ? "INVALID_CONFIGURATION"
+          : "INVALID_LENGTH",
+        path,
+      }),
+    );
   });
 });
