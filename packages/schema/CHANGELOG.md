@@ -1,5 +1,11 @@
 # constructa-schema
 
+## 2.1.0
+
+### Minor Changes
+
+- a42d8e9: Add the shared structured error taxonomy with safe serialization, normalized causes, and configuration-error integration for schema validation.
+
 ## 2.0.0
 
 ### Major Changes
