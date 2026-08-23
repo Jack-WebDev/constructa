@@ -1,6 +1,6 @@
 {
   "name": "constructa-exporters",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Serializers and export formats for Constructa-generated data.",
   "private": false,
   "license": "MIT",
