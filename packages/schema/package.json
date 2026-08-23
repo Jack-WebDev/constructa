@@ -1,7 +1,7 @@
 {
   "name": "constructa-schema",
   "version": "2.4.2",
-  "description": "Portable schemas and types for Constructa generator definitions.",
+  "description": "Portable JSON generator definitions, versioned documents, validation, and error types for Constructa.",
   "private": false,
   "license": "MIT",
   "repository": {

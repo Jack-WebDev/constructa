@@ -1,7 +1,7 @@
 {
   "name": "constructa-sdk",
   "version": "0.2.0",
-  "description": "The supported developer-facing API for Constructa.",
+  "description": "Ergonomic developer API for defining and executing Constructa generators.",
   "private": false,
   "license": "MIT",
   "repository": {

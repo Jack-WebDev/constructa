@@ -1,7 +1,7 @@
 {
   "name": "@constructa/config",
   "version": "0.0.0",
-  "description": "Shared TypeScript configuration for Constructa packages.",
+  "description": "Shared development tooling configuration for Constructa workspaces.",
   "private": true,
   "license": "MIT"
 }
