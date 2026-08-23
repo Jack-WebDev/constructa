@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
   createDefaultRandomSource,
+  createExecutor,
   createGenerationContext,
   createGeneratorDefinition,
   createRandomSource,
@@ -636,6 +637,150 @@ describe("runtime parsing", () => {
       expect.objectContaining({
         code: "PARSE_DEPTH_LIMIT",
         path: ["nested", "nested"],
+      }),
+    );
+  });
+});
+
+describe("single-value execution", () => {
+  it("dispatches registered implementations with exact output inference", () => {
+    const registry = createRegistry();
+    registry.register(integerImplementation);
+    registry.register(
+      defineGenerator({
+        type: "label",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        generate() {
+          return "generated" as const;
+        },
+      }),
+    );
+    const executor = createExecutor(registry);
+    const result = executor.generate(integer(4), { seed: "same" });
+
+    expectTypeOf(result).toEqualTypeOf<number>();
+    expect(result).toBeTypeOf("number");
+    expect(executor.generate({ type: "label" }, { seed: "same" })).toBe(
+      "generated",
+    );
+  });
+
+  it("uses a fresh seeded source per root and passes it only through context", () => {
+    const registry = createRegistry();
+    registry.register(
+      defineGenerator({
+        type: "random-value",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        generate({ context: generationContext }) {
+          return generationContext.random.integer(1_000_000);
+        },
+      }),
+    );
+    const executor = createExecutor(registry);
+    const definition = { type: "random-value" } as const;
+
+    expect(executor.generate(definition, { seed: "repeatable" })).toBe(
+      executor.generate(definition, { seed: "repeatable" }),
+    );
+    expect(executor.generate(definition, { seed: "different" })).not.toBe(
+      executor.generate(definition, { seed: "repeatable" }),
+    );
+  });
+
+  it("validates options and definitions before generator execution", () => {
+    const registry = createRegistry();
+    const generate = vi.fn(() => 1);
+    registry.register(
+      defineGenerator({
+        type: "guarded",
+        version: 1,
+        validateDefinition(definition) {
+          return typeof (definition as { value?: unknown }).value === "number"
+            ? []
+            : [
+                {
+                  code: "invalid_value",
+                  path: ["value"],
+                  message: "value must be a number",
+                },
+              ];
+        },
+        generate,
+      }),
+    );
+    const executor = createExecutor(registry);
+    const random = createSeededRandom("injected");
+
+    expect(() =>
+      executor.generate({ type: "guarded" }, { seed: "seed", random }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "CONFLICTING_RANDOM_OPTIONS",
+        path: ["seed"],
+      }),
+    );
+    expect(() => executor.generate({ type: "guarded" })).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: ["value"],
+      }),
+    );
+    expect(generate).not.toHaveBeenCalled();
+  });
+
+  it("does not validate a definition again after parsing it", () => {
+    const registry = createRegistry();
+    const validateDefinition = vi.fn(() => []);
+    registry.register(
+      defineGenerator({
+        type: "parsed",
+        version: 1,
+        validateDefinition,
+        generate() {
+          return "ok";
+        },
+      }),
+    );
+    const parsed = parseDefinition({ type: "parsed" }, { registry });
+
+    expect(createExecutor(registry).generate(parsed, { seed: 1 })).toBe("ok");
+    expect(validateDefinition).toHaveBeenCalledTimes(1);
+  });
+
+  it("runs dependency analysis against the execution snapshot", () => {
+    const registry = createRegistry();
+    registry.register(implementation("dependency"));
+    registry.register(
+      defineGenerator({
+        type: "root",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        analyzeDependencies() {
+          return [{ typeId: "missing", path: ["dependency"] }];
+        },
+        generate() {
+          return 1;
+        },
+      }),
+    );
+
+    expect(() =>
+      createExecutor(registry).generate({ type: "root" }, { seed: 1 }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "UNKNOWN_GENERATOR",
+        path: ["dependency", "type"],
       }),
     );
   });

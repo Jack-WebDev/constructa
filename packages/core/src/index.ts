@@ -33,6 +33,23 @@ export type RandomSourceAdapter = RandomSource;
 
 export type Seed = number | string;
 
+export type ExecutionOptions = {
+  /** Uses a fresh deterministic source for this root execution. */
+  readonly seed?: Seed;
+  /**
+   * A caller-owned source consumed by this execution. The executor does not
+   * reset, clone, or otherwise retain it after the call returns.
+   */
+  readonly random?: RandomSource;
+};
+
+export type Executor = {
+  generate: <Definition extends GeneratorDefinition>(
+    definition: Definition,
+    options?: ExecutionOptions,
+  ) => import("constructa-schema").Infer<Definition>;
+};
+
 export const SEEDED_RANDOM_ALGORITHM = "mulberry32";
 export const SEEDED_RANDOM_ALGORITHM_VERSION = 1;
 
@@ -282,7 +299,7 @@ export type ParseDefinitionOptions = {
 export type ParseDocumentOptions = ParseDefinitionOptions;
 
 export type DefinitionParseResult =
-  | { readonly success: true; readonly value: GeneratorDefinition }
+  | { readonly success: true; readonly value: ParsedGeneratorDefinition }
   | { readonly success: false; readonly issues: readonly ConstructaError[] };
 
 export type DocumentParseResult =
@@ -296,7 +313,7 @@ export type DocumentParseResult =
 export function parseDefinition(
   value: unknown,
   options: ParseDefinitionOptions,
-): GeneratorDefinition {
+): ParsedGeneratorDefinition {
   const result = safeParseDefinition(value, options);
   if (result.success) return result.value;
   throw result.issues[0];
@@ -348,6 +365,15 @@ export type GeneratorDependency = {
   readonly typeId: string;
   readonly path: ValidationPath;
 };
+
+declare const parsedGeneratorDefinition: unique symbol;
+
+/** A runtime-validated definition accepted by an executor without revalidation. */
+export type ParsedGeneratorDefinition = GeneratorDefinition & {
+  readonly [parsedGeneratorDefinition]: true;
+};
+
+const parsedDefinitions = new WeakSet<object>();
 
 export type GeneratorImplementation<
   Definition extends GeneratorDefinition<Output>,
@@ -447,6 +473,151 @@ export function createRegistry(): GeneratorRegistry {
       return createRegistrySnapshot(implementations);
     },
   };
+}
+
+/**
+ * Creates an advanced single-value executor over an immutable registry
+ * snapshot. Normal applications will receive this behavior through the SDK.
+ */
+export function createExecutor(
+  registry: GeneratorRegistry | GeneratorRegistrySnapshot,
+): Executor {
+  const snapshot = createExecutionSnapshot(registry);
+
+  return Object.freeze({
+    generate<Definition extends GeneratorDefinition>(
+      definition: Definition,
+      options?: ExecutionOptions,
+    ): import("constructa-schema").Infer<Definition> {
+      const random = resolveExecutionRandom(options);
+      const parsed = parsedDefinitions.has(definition)
+        ? definition
+        : parseDefinition(definition, { registry: snapshot });
+      const implementation = snapshot.lookup(parsed.type);
+
+      analyzeGeneratorDependencies(implementation, parsed, snapshot);
+      const context = createGenerationContext({ random });
+      return invokeValidatedGeneratorImplementation(
+        implementation,
+        parsed,
+        context,
+      ) as import("constructa-schema").Infer<Definition>;
+    },
+  });
+}
+
+function createExecutionSnapshot(
+  registry: GeneratorRegistry | GeneratorRegistrySnapshot,
+): GeneratorRegistrySnapshot {
+  if (typeof registry !== "object" || registry === null) {
+    throw contextError(
+      "INVALID_EXECUTOR_REGISTRY",
+      ["registry"],
+      "Executor requires a generator registry.",
+    );
+  }
+  if (typeof (registry as GeneratorRegistry).snapshot === "function") {
+    return (registry as GeneratorRegistry).snapshot();
+  }
+  if (typeof (registry as GeneratorRegistrySnapshot).lookup === "function") {
+    return registry as GeneratorRegistrySnapshot;
+  }
+  throw contextError(
+    "INVALID_EXECUTOR_REGISTRY",
+    ["registry"],
+    "Executor requires a generator registry.",
+  );
+}
+
+function resolveExecutionRandom(
+  options: ExecutionOptions | undefined,
+): RandomSource {
+  if (options === undefined) return createDefaultRandomSource();
+  if (typeof options !== "object" || options === null) {
+    throw contextError(
+      "INVALID_EXECUTION_OPTIONS",
+      [],
+      "Execution options must be an object.",
+    );
+  }
+  if (options.seed !== undefined && options.random !== undefined) {
+    throw contextError(
+      "CONFLICTING_RANDOM_OPTIONS",
+      ["seed"],
+      "seed and random cannot be supplied together.",
+    );
+  }
+  if (options.seed !== undefined) return createSeededRandom(options.seed);
+  if (options.random !== undefined) return createRandomSource(options.random);
+  return createDefaultRandomSource();
+}
+
+function analyzeGeneratorDependencies(
+  implementation: GeneratorImplementation<GeneratorDefinition, unknown>,
+  definition: GeneratorDefinition,
+  registry: GeneratorRegistrySnapshot,
+): void {
+  if (implementation.analyzeDependencies === undefined) return;
+  let dependencies: readonly GeneratorDependency[];
+  try {
+    dependencies = implementation.analyzeDependencies(definition);
+  } catch (cause) {
+    throw normalizeConstructaError(cause, {
+      kind: "dependency",
+      code: "DEPENDENCY_ANALYSIS_FAILED",
+      path: [],
+      message: "Generator dependency analysis failed.",
+    });
+  }
+  if (!Array.isArray(dependencies)) {
+    throw new ConstructaError({
+      kind: "system",
+      code: "DEPENDENCY_ANALYSIS_FAILED",
+      path: [],
+      message: "Generator dependency analysis returned an invalid result.",
+    });
+  }
+  for (const dependency of dependencies) {
+    if (!isGeneratorDependency(dependency)) {
+      throw new ConstructaError({
+        kind: "system",
+        code: "DEPENDENCY_ANALYSIS_FAILED",
+        path: [],
+        message:
+          "Generator dependency analysis returned an invalid dependency.",
+      });
+    }
+    registry.lookup(dependency.typeId, dependency.path);
+  }
+}
+
+function isGeneratorDependency(value: unknown): value is GeneratorDependency {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as GeneratorDependency).typeId === "string" &&
+    Array.isArray((value as GeneratorDependency).path) &&
+    (value as GeneratorDependency).path.every(
+      (segment) => typeof segment === "string" || Number.isSafeInteger(segment),
+    )
+  );
+}
+
+function invokeValidatedGeneratorImplementation(
+  implementation: GeneratorImplementation<GeneratorDefinition, unknown>,
+  definition: GeneratorDefinition,
+  context: GenerationContext,
+): unknown {
+  try {
+    return implementation.generate({ definition, context });
+  } catch (cause) {
+    throw normalizeConstructaError(cause, {
+      kind: "execution",
+      code: "EXECUTION_FAILED",
+      path: [],
+      message: "Generator execution failed.",
+    });
+  }
 }
 
 /**
@@ -574,8 +745,18 @@ function parseRuntimeDefinition(
     issues,
   );
   return issues.length === 0
-    ? { success: true, value: value as GeneratorDefinition }
+    ? {
+        success: true,
+        value: markParsedDefinition(value as GeneratorDefinition),
+      }
     : { success: false, issues: Object.freeze(issues) };
+}
+
+function markParsedDefinition(
+  definition: GeneratorDefinition,
+): ParsedGeneratorDefinition {
+  parsedDefinitions.add(definition);
+  return definition as ParsedGeneratorDefinition;
 }
 
 function visitRuntimeDefinition(
