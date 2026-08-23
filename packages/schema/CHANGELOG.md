@@ -1,5 +1,13 @@
 # constructa-schema
 
+## 2.4.2
+
+### Patch Changes
+
+- a2fc852: Improve JSR package documentation with runnable usage examples and complete
+  public API documentation. The SDK now provides the supported facade for the
+  core execution APIs and built-in generator factories.
+
 ## 2.4.1
 
 ### Patch Changes

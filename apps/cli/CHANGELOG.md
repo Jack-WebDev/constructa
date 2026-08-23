@@ -1,5 +1,12 @@
 # @constructa/cli
 
+## 0.0.24
+
+### Patch Changes
+
+- Updated dependencies [a2fc852]
+  - constructa-sdk@0.2.0
+
 ## 0.0.23
 
 ### Patch Changes

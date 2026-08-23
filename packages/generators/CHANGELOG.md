@@ -1,5 +1,16 @@
 # constructa-generators
 
+## 0.4.6
+
+### Patch Changes
+
+- a2fc852: Improve JSR package documentation with runnable usage examples and complete
+  public API documentation. The SDK now provides the supported facade for the
+  core execution APIs and built-in generator factories.
+- Updated dependencies [a2fc852]
+  - constructa-core@0.9.2
+  - constructa-schema@2.4.2
+
 ## 0.4.5
 
 ### Patch Changes
