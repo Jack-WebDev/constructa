@@ -31,6 +31,8 @@ A `GeneratorDocumentV1` wraps exactly one root definition and carries versioning
 
 Use `parseDocument` to validate and obtain a `GeneratorDocumentV1`, or `safeParseDocument` for a non-throwing parse result. Use `isGeneratorDefinition` or `assertGeneratorDefinition` when validating an unwrapped definition.
 
+Use `serializeDefinition()` or `serializeDocument()` when stable JSON text is needed for storage, review, or diffs. Both validate their input through the same schema boundary and emit two-space JSON with recursively sorted object keys and one trailing newline. The serialized text remains ordinary JSON and round-trips through `JSON.parse`; generated values are not documents and cannot be serialized as one.
+
 ## Validation issues
 
 Validation APIs expose stable issues with a `code`, human-readable `message`, segment-based `path`, and optional JSON-safe `details`. A path is a `readonly (string | number)[]`: a property named `profile.age` remains the single segment `"profile.age"`, while an array item uses a numeric segment such as `0`.
