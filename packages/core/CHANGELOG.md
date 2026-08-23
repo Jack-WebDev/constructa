@@ -1,5 +1,11 @@
 # constructa-core
 
+## 0.6.0
+
+### Minor Changes
+
+- 77259cb: Add object-local value dependency scheduling and read-only reference resolution.
+
 ## 0.5.0
 
 ### Minor Changes

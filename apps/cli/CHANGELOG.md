@@ -1,5 +1,11 @@
 # @constructa/cli
 
+## 0.0.16
+
+### Patch Changes
+
+- constructa-sdk@0.0.16
+
 ## 0.0.15
 
 ### Patch Changes
