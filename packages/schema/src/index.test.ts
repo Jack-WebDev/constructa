@@ -10,14 +10,17 @@ import {
   GENERATOR_DOCUMENT_TOP_LEVEL_KEYS,
   type GeneratorDefinition,
   GeneratorDocumentError,
+  type GeneratorDocumentV1,
   GeneratorMetadataError,
   isDocument,
   isGeneratorDefinition,
   isGeneratorMetadata,
   isJsonValue,
   JsonValueError,
+  migrateDocument,
   normalizeConstructaError,
   parseDocument,
+  SchemaVersionError,
   SERIALIZATION_DEFINITION_FIXTURES,
   SERIALIZATION_DOCUMENT_FIXTURES,
   safeParseDocument,
@@ -399,6 +402,87 @@ describe("generator documents", () => {
       }),
     });
     expect(() => assertDocument(oldEnvelope)).toThrow(GeneratorDocumentError);
+  });
+});
+
+describe("schema compatibility", () => {
+  it("dispatches the supported schema version parser", () => {
+    const document = {
+      schemaVersion: CURRENT_SCHEMA_VERSION,
+      definition: { type: "boolean" },
+    } as const;
+
+    expectTypeOf(parseDocument(document)).toEqualTypeOf<GeneratorDocumentV1>();
+    expect(parseDocument(document)).toBe(document);
+  });
+
+  it("returns the shared unsupported-version error without migration", () => {
+    expect(() =>
+      parseDocument({ schemaVersion: 0, definition: { type: "boolean" } }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "UNSUPPORTED_SCHEMA_VERSION",
+        path: ["schemaVersion"],
+      }),
+    );
+    expect(() =>
+      parseDocument({ schemaVersion: 2, definition: { type: "boolean" } }),
+    ).toThrow(SchemaVersionError);
+  });
+
+  it("applies an explicit migration without mutating its source", () => {
+    const source = {
+      schemaVersion: 0,
+      name: "Legacy boolean",
+      definition: { type: "boolean" },
+    };
+    const migrated = migrateDocument(source, {
+      from: 0,
+      to: CURRENT_SCHEMA_VERSION,
+      migrate(document) {
+        return { ...document, schemaVersion: CURRENT_SCHEMA_VERSION };
+      },
+    });
+
+    expectTypeOf(migrated).toEqualTypeOf<GeneratorDocumentV1>();
+    expect(source.schemaVersion).toBe(0);
+    expect(migrated).toEqual({ ...source, schemaVersion: 1 });
+  });
+
+  it("rejects migration declarations and source versions at the migration boundary", () => {
+    expect(() =>
+      migrateDocument(
+        { schemaVersion: 0, definition: { type: "boolean" } },
+        {
+          from: 0,
+          to: 2 as never,
+          migrate: (document) => document,
+        },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: ["migration"],
+      }),
+    );
+    expect(() =>
+      migrateDocument(
+        { schemaVersion: 1, definition: { type: "boolean" } },
+        {
+          from: 0,
+          to: CURRENT_SCHEMA_VERSION,
+          migrate: (document) => document,
+        },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "UNSUPPORTED_SCHEMA_VERSION",
+        path: ["schemaVersion"],
+      }),
+    );
   });
 });
 
