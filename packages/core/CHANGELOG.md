@@ -1,5 +1,11 @@
 # constructa-core
 
+## 0.8.0
+
+### Minor Changes
+
+- befceab: Validate template reference graphs and report deterministic missing and circular dependencies.
+
 ## 0.7.1
 
 ### Patch Changes

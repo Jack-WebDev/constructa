@@ -1,5 +1,13 @@
 # constructa-generators
 
+## 0.4.1
+
+### Patch Changes
+
+- befceab: Validate template reference graphs and report deterministic missing and circular dependencies.
+- Updated dependencies [befceab]
+  - constructa-core@0.8.0
+
 ## 0.4.0
 
 ### Minor Changes
