@@ -9,11 +9,13 @@ import {
 import {
   ConstructaError,
   type JsonValue,
+  validateGeneratorDefinition,
   validateJsonValue,
 } from "constructa-schema";
 
 export const MAX_DECIMAL_PRECISION = 15;
 export const MAX_STRING_LENGTH = 10_000;
+export const MAX_ARRAY_LENGTH = 10_000;
 
 const STRING_CHARSETS = {
   alphabetic: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
@@ -22,6 +24,128 @@ const STRING_CHARSETS = {
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
   hex: "0123456789abcdef",
 } as const;
+
+export type UuidDefinition = GeneratorDefinition<string> & {
+  readonly type: "uuid";
+};
+
+/** Builds a portable UUID version 4 definition. */
+export function uuid(): UuidDefinition {
+  return createGeneratorDefinition({ type: "uuid" }) as UuidDefinition;
+}
+
+export const uuidGenerator: GeneratorImplementation<UuidDefinition, string> =
+  defineGenerator({
+    type: "uuid",
+    version: 1,
+    validateDefinition: validateUuidDefinition,
+    generate({ context }) {
+      const bytes = context.random.bytes(16);
+      bytes[6] = ((bytes[6] ?? 0) & 0x0f) | 0x40;
+      bytes[8] = ((bytes[8] ?? 0) & 0x3f) | 0x80;
+      return formatUuid(bytes);
+    },
+  });
+
+export function registerUuidGenerator(registry: GeneratorRegistry): void {
+  registry.register(uuidGenerator);
+}
+
+export type ObjectFields = Readonly<Record<string, GeneratorDefinition>>;
+export type ObjectOutput<Fields extends ObjectFields> = {
+  [Key in keyof Fields]: InferGenerator<Fields[Key]>;
+};
+export type ObjectDefinition<Fields extends ObjectFields = ObjectFields> =
+  GeneratorDefinition<ObjectOutput<Fields>> & {
+    readonly type: "object";
+    readonly fields: Fields;
+  };
+
+type InferGenerator<Definition> =
+  Definition extends GeneratorDefinition<infer Output> ? Output : never;
+
+/** Builds a composite object definition from named child definitions. */
+export function object<const Fields extends ObjectFields>(
+  fields: Fields,
+): ObjectDefinition<Fields>;
+export function object(fields: unknown): ObjectDefinition {
+  const issues = validateObjectDefinition({ type: "object", fields });
+  assertValidGeneratorOptions(issues);
+  return createGeneratorDefinition({
+    type: "object",
+    fields: fields as ObjectFields,
+  }) as ObjectDefinition;
+}
+
+export const objectGenerator: GeneratorImplementation<
+  ObjectDefinition,
+  Record<string, unknown>
+> = defineGenerator({
+  type: "object",
+  version: 1,
+  validateDefinition: validateObjectDefinition,
+  generate({ definition, context }) {
+    const result: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(definition.fields)) {
+      result[key] = context.executeChild(child, key);
+    }
+    return result;
+  },
+});
+
+export function registerObjectGenerator(registry: GeneratorRegistry): void {
+  registry.register(objectGenerator);
+}
+
+export type ArrayOptions = {
+  readonly length: number;
+};
+export type ArrayDefinition<
+  Item extends GeneratorDefinition = GeneratorDefinition,
+> = GeneratorDefinition<InferGenerator<Item>[]> & {
+  readonly type: "array";
+  readonly item: Item;
+  readonly length: number;
+};
+
+/** Builds a fixed-length composite array definition. */
+export function array<const Item extends GeneratorDefinition>(
+  item: Item,
+  options: ArrayOptions,
+): ArrayDefinition<Item>;
+export function array(item: unknown, options: unknown): ArrayDefinition {
+  const issues = validateArrayDefinition({
+    type: "array",
+    item,
+    ...(isDefinitionRecord(options) ? options : { length: undefined }),
+  });
+  assertValidGeneratorOptions(issues);
+  return createGeneratorDefinition({
+    type: "array",
+    item: item as GeneratorDefinition,
+    length: (options as ArrayOptions).length,
+  }) as ArrayDefinition;
+}
+
+export const arrayGenerator: GeneratorImplementation<
+  ArrayDefinition,
+  unknown[]
+> = defineGenerator({
+  type: "array",
+  version: 1,
+  validateDefinition: validateArrayDefinition,
+  generate({ definition, context }) {
+    const result: unknown[] = [];
+    for (let index = 0; index < definition.length; index += 1) {
+      result.push(context.executeChild(definition.item, index));
+    }
+    return result;
+  },
+});
+
+export function registerArrayGenerator(registry: GeneratorRegistry): void {
+  registry.register(arrayGenerator);
+}
 
 export type ChoiceDefinition<Value extends JsonValue = JsonValue> =
   GeneratorDefinition<Value> & {
@@ -303,6 +427,78 @@ function validateIntegerDefinition(value: unknown): readonly ValidationIssue[] {
   return [];
 }
 
+function validateUuidDefinition(value: unknown): readonly ValidationIssue[] {
+  return validateExactDefinitionKeys(value, "uuid", []);
+}
+
+function validateObjectDefinition(value: unknown): readonly ValidationIssue[] {
+  const keyIssues = validateExactDefinitionKeys(value, "object", ["fields"]);
+  if (keyIssues.length > 0) return keyIssues;
+
+  const fields = (value as { readonly fields?: unknown }).fields;
+  if (!isDefinitionRecord(fields)) {
+    return [invalidConfiguration(["fields"], "fields must be an object")];
+  }
+
+  const issues: ValidationIssue[] = [];
+  for (const [key, child] of Object.entries(fields)) {
+    for (const issue of validateGeneratorDefinition(child)) {
+      issues.push({ ...issue, path: ["fields", key, ...issue.path] });
+    }
+  }
+  return issues;
+}
+
+function validateArrayDefinition(value: unknown): readonly ValidationIssue[] {
+  const keyIssues = validateExactDefinitionKeys(value, "array", [
+    "item",
+    "length",
+  ]);
+  if (keyIssues.length > 0) return keyIssues;
+
+  const definition = value as {
+    readonly item?: unknown;
+    readonly length?: unknown;
+  };
+  const issues: ValidationIssue[] = [];
+  for (const issue of validateGeneratorDefinition(definition.item)) {
+    issues.push({ ...issue, path: ["item", ...issue.path] });
+  }
+  if (
+    !Number.isSafeInteger(definition.length) ||
+    (definition.length as number) < 0 ||
+    (definition.length as number) > MAX_ARRAY_LENGTH
+  ) {
+    issues.push(
+      invalidLength(
+        ["length"],
+        `length must be an integer from 0 to ${MAX_ARRAY_LENGTH}`,
+      ),
+    );
+  }
+  return issues;
+}
+
+function validateExactDefinitionKeys(
+  value: unknown,
+  type: string,
+  keys: readonly string[],
+): readonly ValidationIssue[] {
+  if (!isDefinitionRecord(value)) {
+    return [invalidConfiguration([], `${type} definition must be an object`)];
+  }
+  const definition = value as { readonly type?: unknown };
+  if (definition.type !== type) {
+    return [invalidConfiguration(["type"], `type must be ${type}`)];
+  }
+  const allowed = new Set(["type", ...keys]);
+  return Object.keys(value)
+    .filter((key) => !allowed.has(key))
+    .map((key) =>
+      invalidConfiguration([key], `Unknown ${type} property: ${key}`),
+    );
+}
+
 function validateBooleanDefinition(value: unknown): readonly ValidationIssue[] {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return [
@@ -459,6 +655,13 @@ function isDefinitionRecord(value: unknown): value is Record<string, unknown> {
 
 function resolveCharset(charset: string): string {
   return STRING_CHARSETS[charset as keyof typeof STRING_CHARSETS] ?? charset;
+}
+
+function formatUuid(bytes: Uint8Array): string {
+  const hexadecimal = Array.from(bytes, (byte) =>
+    byte.toString(16).padStart(2, "0"),
+  );
+  return `${hexadecimal.slice(0, 4).join("")}-${hexadecimal.slice(4, 6).join("")}-${hexadecimal.slice(6, 8).join("")}-${hexadecimal.slice(8, 10).join("")}-${hexadecimal.slice(10, 16).join("")}`;
 }
 
 function isCanonicalIsoDate(value: string): boolean {
