@@ -110,4 +110,16 @@ describe("architecture boundary check", () => {
       expect.stringContaining("web may not import constructa-core"),
     ]);
   });
+
+  it("rejects browser and UI modules in core packages", async () => {
+    const rootDirectory = await createFixture({
+      coreSource: 'import "react";\nexport {};',
+    });
+
+    await expect(checkArchitecture(rootDirectory)).resolves.toEqual([
+      expect.stringContaining(
+        'constructa-core may not import browser or UI module "react"',
+      ),
+    ]);
+  });
 });

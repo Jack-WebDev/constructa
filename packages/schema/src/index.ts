@@ -3,6 +3,15 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 export type JsonArray = readonly JsonValue[];
 export type JsonObject = { readonly [key: string]: JsonValue };
 
+export type ValidationPathSegment = string | number;
+export type ValidationPath = readonly ValidationPathSegment[];
+export type ValidationIssue = {
+  readonly code: string;
+  readonly path: ValidationPath;
+  readonly message: string;
+  readonly details?: JsonObject;
+};
+
 export const CURRENT_SCHEMA_VERSION = 1;
 export const SUPPORTED_SCHEMA_VERSIONS = [CURRENT_SCHEMA_VERSION] as const;
 export type SchemaVersion = (typeof SUPPORTED_SCHEMA_VERSIONS)[number];
@@ -20,11 +29,41 @@ export type GeneratorDocumentV1 = {
 
 export type GeneratorDocument = GeneratorDocumentV1;
 
+/** A stable, lowercase identifier used to classify portable metadata. */
+export type SemanticMetadataId = string;
+
+/** A coarse output-preview classification, not an execution or inference type. */
+export type GeneratorOutputCategory = SemanticMetadataId;
+
+/**
+ * Portable, descriptive metadata for a generator implementation.
+ * It is intentionally separate from executable generator definitions.
+ */
+export type GeneratorMetadata = {
+  readonly typeId?: SemanticMetadataId;
+  readonly displayName?: string;
+  readonly description?: string;
+  readonly category?: SemanticMetadataId;
+  readonly outputCategory?: GeneratorOutputCategory;
+  readonly documentationUrl?: string;
+  readonly examples?: readonly JsonValue[];
+};
+
 export const GENERATOR_DOCUMENT_TOP_LEVEL_KEYS = [
   "schemaVersion",
   "name",
   "description",
   "definition",
+] as const;
+
+export const GENERATOR_METADATA_KEYS = [
+  "typeId",
+  "displayName",
+  "description",
+  "category",
+  "outputCategory",
+  "documentationUrl",
+  "examples",
 ] as const;
 
 const DOCUMENT_METADATA_KEYS = new Set([
@@ -45,10 +84,10 @@ export type SchemaVersionFailureCode =
 export type SchemaVersionFailure = {
   readonly code: SchemaVersionFailureCode;
   readonly message: string;
-  readonly path: string;
+  readonly path: ValidationPath;
   readonly severity: "error";
-  readonly supportedVersions: readonly SchemaVersion[];
-};
+  readonly details: { readonly supportedVersions: readonly SchemaVersion[] };
+} & ValidationIssue;
 
 export type GeneratorDefinitionFailureCode =
   | "generator_definition_not_json"
@@ -59,7 +98,25 @@ export type GeneratorDefinitionFailureCode =
 export type GeneratorDefinitionFailure = {
   readonly code: GeneratorDefinitionFailureCode;
   readonly message: string;
-  readonly path: string;
+  readonly path: ValidationPath;
+  readonly severity: "error";
+};
+
+export type GeneratorMetadataFailureCode =
+  | "generator_metadata_not_json"
+  | "generator_metadata_not_object"
+  | "metadata_type_id_invalid"
+  | "metadata_display_name_invalid"
+  | "metadata_description_invalid"
+  | "metadata_category_invalid"
+  | "metadata_output_category_invalid"
+  | "metadata_documentation_url_invalid"
+  | "metadata_examples_invalid"
+  | "metadata_property_unknown";
+export type GeneratorMetadataFailure = {
+  readonly code: GeneratorMetadataFailureCode;
+  readonly message: string;
+  readonly path: ValidationPath;
   readonly severity: "error";
 };
 
@@ -81,7 +138,7 @@ export type GeneratorDocumentFailure =
         SchemaVersionFailureCode
       >;
       readonly message: string;
-      readonly path: string;
+      readonly path: ValidationPath;
       readonly severity: "error";
     };
 export type GeneratorDocumentParseResult =
@@ -89,16 +146,18 @@ export type GeneratorDocumentParseResult =
   | { readonly success: false; readonly failure: GeneratorDocumentFailure };
 
 export class JsonValueError extends TypeError {
-  constructor(path: string, reason: string) {
-    super(`${path}: ${reason}`);
+  readonly issue: ValidationIssue;
+  constructor(path: ValidationPath, reason: string) {
+    super(`${formatValidationPath(path)}: ${reason}`);
     this.name = "JsonValueError";
+    this.issue = { code: "invalid_json_value", path, message: reason };
   }
 }
 
 export class SchemaVersionError extends TypeError {
   readonly failure: SchemaVersionFailure;
   constructor(failure: SchemaVersionFailure) {
-    super(`${failure.path}: ${failure.message}`);
+    super(`${formatValidationPath(failure.path)}: ${failure.message}`);
     this.name = "SchemaVersionError";
     this.failure = failure;
   }
@@ -107,8 +166,17 @@ export class SchemaVersionError extends TypeError {
 export class GeneratorDefinitionError extends TypeError {
   readonly failure: GeneratorDefinitionFailure;
   constructor(failure: GeneratorDefinitionFailure) {
-    super(`${failure.path}: ${failure.message}`);
+    super(`${formatValidationPath(failure.path)}: ${failure.message}`);
     this.name = "GeneratorDefinitionError";
+    this.failure = failure;
+  }
+}
+
+export class GeneratorMetadataError extends TypeError {
+  readonly failure: GeneratorMetadataFailure;
+  constructor(failure: GeneratorMetadataFailure) {
+    super(`${formatValidationPath(failure.path)}: ${failure.message}`);
+    this.name = "GeneratorMetadataError";
     this.failure = failure;
   }
 }
@@ -116,14 +184,14 @@ export class GeneratorDefinitionError extends TypeError {
 export class GeneratorDocumentError extends TypeError {
   readonly failure: GeneratorDocumentFailure;
   constructor(failure: GeneratorDocumentFailure) {
-    super(`${failure.path}: ${failure.message}`);
+    super(`${formatValidationPath(failure.path)}: ${failure.message}`);
     this.name = "GeneratorDocumentError";
     this.failure = failure;
   }
 }
 
 export function isJsonValue(value: unknown): value is JsonValue {
-  return findJsonValueError(value) === undefined;
+  return validateJsonValue(value).length === 0;
 }
 export function isSchemaVersion(value: unknown): value is SchemaVersion {
   return value === CURRENT_SCHEMA_VERSION;
@@ -131,146 +199,251 @@ export function isSchemaVersion(value: unknown): value is SchemaVersion {
 export function isGeneratorDefinition(
   value: unknown,
 ): value is GeneratorDefinition {
-  return findGeneratorDefinitionFailure(value) === undefined;
+  return validateGeneratorDefinition(value).length === 0;
 }
 export function isDocument(value: unknown): value is GeneratorDocumentV1 {
-  return findDocumentFailure(value) === undefined;
+  return validateDocument(value).length === 0;
+}
+export function isGeneratorMetadata(
+  value: unknown,
+): value is GeneratorMetadata {
+  return validateGeneratorMetadata(value).length === 0;
 }
 export function assertJsonValue(
   value: unknown,
-  path = "$",
+  path: ValidationPath = [],
 ): asserts value is JsonValue {
-  const error = findJsonValueError(value, path);
-  if (error !== undefined) throw new JsonValueError(error.path, error.reason);
+  const [issue] = validateJsonValue(value, path);
+  if (issue !== undefined) throw new JsonValueError(issue.path, issue.message);
 }
 export function assertSchemaVersion(
   value: unknown,
-  path = "$.schemaVersion",
+  path: ValidationPath = ["schemaVersion"],
 ): asserts value is SchemaVersion {
   const failure = findSchemaVersionValueFailure(value, path);
   if (failure !== undefined) throw new SchemaVersionError(failure);
 }
 export function assertGeneratorDefinition(
   value: unknown,
-  path = "$",
+  path: ValidationPath = [],
 ): asserts value is GeneratorDefinition {
-  const failure = findGeneratorDefinitionFailure(value, path);
+  const [failure] = validateGeneratorDefinition(value, path);
   if (failure !== undefined) throw new GeneratorDefinitionError(failure);
+}
+export function assertGeneratorMetadata(
+  value: unknown,
+  path: ValidationPath = [],
+): asserts value is GeneratorMetadata {
+  const [failure] = validateGeneratorMetadata(value, path);
+  if (failure !== undefined) throw new GeneratorMetadataError(failure);
 }
 export function assertDocument(
   value: unknown,
-  path = "$",
+  path: ValidationPath = [],
 ): asserts value is GeneratorDocumentV1 {
-  const failure = findDocumentFailure(value, path);
-  if (failure !== undefined) throw new GeneratorDocumentError(failure);
+  const [issue] = validateDocument(value, path);
+  if (issue !== undefined) throw new GeneratorDocumentError(issue);
 }
-export function parseDocument(value: unknown, path = "$"): GeneratorDocumentV1 {
+export function parseDocument(
+  value: unknown,
+  path: ValidationPath = [],
+): GeneratorDocumentV1 {
   assertDocument(value, path);
   return value;
 }
 export function safeParseDocument(
   value: unknown,
-  path = "$",
+  path: ValidationPath = [],
 ): GeneratorDocumentParseResult {
-  const failure = findDocumentFailure(value, path);
+  const [failure] = validateDocument(value, path);
   return failure === undefined
     ? { success: true, value: value as GeneratorDocumentV1 }
     : { success: false, failure };
 }
 
-export function findJsonValueError(
+export function validateJsonValue(
   value: unknown,
-  path = "$",
-): { path: string; reason: string } | undefined {
+  path: ValidationPath = [],
+): readonly ValidationIssue[] {
+  const error = findJsonValueError(value, path);
+  return error === undefined
+    ? []
+    : [{ code: "invalid_json_value", path: error.path, message: error.reason }];
+}
+
+function findJsonValueError(
+  value: unknown,
+  path: ValidationPath,
+): { path: ValidationPath; reason: string } | undefined {
   return findJsonValueErrorInternal(value, path, new Set());
 }
-export function findGeneratorDefinitionFailure(
+
+/** Returns all independent document validation issues in deterministic order. */
+export function validateDocument(
   value: unknown,
-  path = "$",
-): GeneratorDefinitionFailure | undefined {
+  path: ValidationPath = [],
+): readonly GeneratorDocumentFailure[] {
   const jsonError = findJsonValueError(value, path);
-  if (jsonError !== undefined)
-    return definitionFailure(
-      "generator_definition_not_json",
+  if (jsonError !== undefined) {
+    return [
+      documentFailure(
+        "generator_document_not_json",
+        jsonError.path,
+        jsonError.reason,
+      ),
+    ];
+  }
+  if (!isJsonRecord(value)) {
+    return [documentFailure("generator_document_not_object", path)];
+  }
+
+  const issues: GeneratorDocumentFailure[] = [];
+  if (Object.hasOwn(value, "configuration") && Object.hasOwn(value, "type")) {
+    issues.push(documentFailure("configuration_envelope_removed", path));
+  }
+  for (const key of Object.keys(value)) {
+    if (!GENERATOR_DOCUMENT_TOP_LEVEL_KEYS.includes(key as never)) {
+      issues.push(
+        documentFailure(
+          "top_level_property_unknown",
+          appendPathSegment(path, key),
+          `Unknown top-level property: ${key}`,
+        ),
+      );
+    }
+  }
+
+  const versionFailure = findSchemaVersionFailure(value, path);
+  if (versionFailure !== undefined) issues.push(versionFailure);
+  for (const property of ["name", "description"] as const) {
+    if (Object.hasOwn(value, property) && typeof value[property] !== "string") {
+      issues.push(
+        documentFailure(
+          property === "name" ? "name_invalid" : "description_invalid",
+          appendPathSegment(path, property),
+        ),
+      );
+    }
+  }
+  if (!Object.hasOwn(value, "definition")) {
+    issues.push(
+      documentFailure(
+        "definition_missing",
+        appendPathSegment(path, "definition"),
+      ),
+    );
+  } else {
+    issues.push(
+      ...validateGeneratorDefinition(
+        value.definition,
+        appendPathSegment(path, "definition"),
+      ),
+    );
+  }
+  return issues;
+}
+
+/** Returns definition issues. Nested typed definitions are validated recursively. */
+export function validateGeneratorDefinition(
+  value: unknown,
+  path: ValidationPath = [],
+): readonly GeneratorDefinitionFailure[] {
+  const jsonError = findJsonValueError(value, path);
+  if (jsonError !== undefined) {
+    return [
+      definitionFailure(
+        "generator_definition_not_json",
+        jsonError.path,
+        jsonError.reason,
+      ),
+    ];
+  }
+  if (!isJsonRecord(value)) {
+    return [definitionFailure("generator_definition_not_object", path)];
+  }
+
+  const issues: GeneratorDefinitionFailure[] = [];
+  collectDefinitionMetadataIssues(value as JsonObject, path, issues, true);
+  return issues;
+}
+export function validateGeneratorMetadata(
+  value: unknown,
+  path: ValidationPath = [],
+): readonly GeneratorMetadataFailure[] {
+  const failure = findGeneratorMetadataFailure(value, path);
+  return failure === undefined ? [] : [failure];
+}
+
+function findGeneratorMetadataFailure(
+  value: unknown,
+  path: ValidationPath = [],
+): GeneratorMetadataFailure | undefined {
+  const jsonError = findJsonValueError(value, path);
+  if (jsonError !== undefined) {
+    return metadataFailure(
+      "generator_metadata_not_json",
       jsonError.path,
       jsonError.reason,
     );
-  if (!isJsonRecord(value))
-    return definitionFailure("generator_definition_not_object", path);
-  if (!Object.hasOwn(value, "type"))
-    return definitionFailure(
-      "generator_type_missing",
-      appendPathSegment(path, "type"),
-    );
-  if (typeof value.type !== "string" || value.type.trim().length === 0)
-    return definitionFailure(
-      "generator_type_invalid",
-      appendPathSegment(path, "type"),
-    );
-  const metadataKey = Object.keys(value).find(
-    (key) => key !== "type" && DOCUMENT_METADATA_KEYS.has(key),
+  }
+  if (!isJsonRecord(value)) {
+    return metadataFailure("generator_metadata_not_object", path);
+  }
+
+  const unknownKey = Object.keys(value).find(
+    (key) => !GENERATOR_METADATA_KEYS.includes(key as never),
   );
-  if (metadataKey !== undefined) {
-    return definitionFailure(
-      "definition_document_metadata",
-      appendPathSegment(path, metadataKey),
+  if (unknownKey !== undefined) {
+    return metadataFailure(
+      "metadata_property_unknown",
+      appendPathSegment(path, unknownKey),
+      `Unknown metadata property: ${unknownKey}`,
     );
   }
 
-  const nestedMetadataPath = findNestedDefinitionMetadataPath(
-    value as JsonObject,
-    path,
-  );
-  return nestedMetadataPath === undefined
-    ? undefined
-    : definitionFailure("definition_document_metadata", nestedMetadataPath);
-}
-export function findDocumentFailure(
-  value: unknown,
-  path = "$",
-): GeneratorDocumentFailure | undefined {
-  const jsonError = findJsonValueError(value, path);
-  if (jsonError !== undefined)
-    return documentFailure(
-      "generator_document_not_json",
-      jsonError.path,
-      jsonError.reason,
-    );
-  if (!isJsonRecord(value))
-    return documentFailure("generator_document_not_object", path);
-  if (Object.hasOwn(value, "configuration") && Object.hasOwn(value, "type"))
-    return documentFailure("configuration_envelope_removed", path);
-  const unknownKey = Object.keys(value).find(
-    (key) => !GENERATOR_DOCUMENT_TOP_LEVEL_KEYS.includes(key as never),
-  );
-  if (unknownKey !== undefined)
-    return documentFailure(
-      "top_level_property_unknown",
-      appendPathSegment(path, unknownKey),
-      `Unknown top-level property: ${unknownKey}`,
-    );
-  const versionFailure = findSchemaVersionFailure(value, path);
-  if (versionFailure !== undefined) return versionFailure;
-  for (const property of ["name", "description"] as const) {
-    if (Object.hasOwn(value, property) && typeof value[property] !== "string")
-      return documentFailure(
-        property === "name" ? "name_invalid" : "description_invalid",
-        appendPathSegment(path, property),
-      );
+  for (const property of ["typeId", "category", "outputCategory"] as const) {
+    if (
+      Object.hasOwn(value, property) &&
+      (typeof value[property] !== "string" || !isMetadataId(value[property]))
+    ) {
+      const code =
+        property === "typeId"
+          ? "metadata_type_id_invalid"
+          : property === "category"
+            ? "metadata_category_invalid"
+            : "metadata_output_category_invalid";
+      return metadataFailure(code, appendPathSegment(path, property));
+    }
   }
-  if (!Object.hasOwn(value, "definition"))
-    return documentFailure(
-      "definition_missing",
-      appendPathSegment(path, "definition"),
+
+  for (const property of [
+    "displayName",
+    "description",
+    "documentationUrl",
+  ] as const) {
+    if (Object.hasOwn(value, property) && typeof value[property] !== "string") {
+      const code =
+        property === "displayName"
+          ? "metadata_display_name_invalid"
+          : property === "description"
+            ? "metadata_description_invalid"
+            : "metadata_documentation_url_invalid";
+      return metadataFailure(code, appendPathSegment(path, property));
+    }
+  }
+
+  if (Object.hasOwn(value, "examples") && !Array.isArray(value.examples)) {
+    return metadataFailure(
+      "metadata_examples_invalid",
+      appendPathSegment(path, "examples"),
     );
-  return findGeneratorDefinitionFailure(
-    value.definition,
-    appendPathSegment(path, "definition"),
-  );
+  }
+
+  return undefined;
 }
-export function findSchemaVersionFailure(
+function findSchemaVersionFailure(
   value: unknown,
-  path = "$",
+  path: ValidationPath = [],
 ): SchemaVersionFailure | undefined {
   if (!isJsonRecord(value) || !Object.hasOwn(value, "schemaVersion"))
     return createSchemaVersionFailure(
@@ -282,9 +455,9 @@ export function findSchemaVersionFailure(
     appendPathSegment(path, "schemaVersion"),
   );
 }
-export function findSchemaVersionValueFailure(
+function findSchemaVersionValueFailure(
   value: unknown,
-  path = "$.schemaVersion",
+  path: ValidationPath = ["schemaVersion"],
 ): SchemaVersionFailure | undefined {
   return isSchemaVersion(value)
     ? undefined
@@ -293,7 +466,7 @@ export function findSchemaVersionValueFailure(
 
 function createSchemaVersionFailure(
   code: SchemaVersionFailureCode,
-  path: string,
+  path: ValidationPath,
 ): SchemaVersionFailure {
   return {
     code,
@@ -303,12 +476,12 @@ function createSchemaVersionFailure(
         : `schemaVersion must be ${CURRENT_SCHEMA_VERSION}`,
     path,
     severity: "error",
-    supportedVersions: SUPPORTED_SCHEMA_VERSIONS,
+    details: { supportedVersions: SUPPORTED_SCHEMA_VERSIONS },
   };
 }
 function definitionFailure(
   code: GeneratorDefinitionFailureCode,
-  path: string,
+  path: ValidationPath,
   message?: string,
 ): GeneratorDefinitionFailure {
   const messages: Record<GeneratorDefinitionFailureCode, string> = {
@@ -323,9 +496,31 @@ function definitionFailure(
   };
   return { code, message: message ?? messages[code], path, severity: "error" };
 }
+function metadataFailure(
+  code: GeneratorMetadataFailureCode,
+  path: ValidationPath,
+  message?: string,
+): GeneratorMetadataFailure {
+  const messages: Record<GeneratorMetadataFailureCode, string> = {
+    generator_metadata_not_json:
+      "generator metadata must be portable JSON data",
+    generator_metadata_not_object: "generator metadata must be a JSON object",
+    metadata_type_id_invalid: "typeId must be a stable metadata ID",
+    metadata_display_name_invalid: "displayName must be a string when present",
+    metadata_description_invalid: "description must be a string when present",
+    metadata_category_invalid: "category must be a stable metadata ID",
+    metadata_output_category_invalid:
+      "outputCategory must be a stable metadata ID",
+    metadata_documentation_url_invalid:
+      "documentationUrl must be a string when present",
+    metadata_examples_invalid: "examples must be an array when present",
+    metadata_property_unknown: "unknown metadata properties are not allowed",
+  };
+  return { code, message: message ?? messages[code], path, severity: "error" };
+}
 function documentFailure(
   code: Exclude<GeneratorDocumentFailureCode, SchemaVersionFailureCode>,
-  path: string,
+  path: ValidationPath,
   message?: string,
 ): Exclude<GeneratorDocumentFailure, SchemaVersionFailure> {
   const messages: Record<
@@ -352,51 +547,99 @@ function documentFailure(
   };
   return { code, message: message ?? messages[code], path, severity: "error" };
 }
-function appendPathSegment(path: string, segment: string) {
-  return path === "$" ? `$.${segment}` : `${path}.${segment}`;
+function appendPathSegment(
+  path: ValidationPath,
+  segment: ValidationPathSegment,
+): ValidationPath {
+  return [...path, segment];
 }
 
-function findNestedDefinitionMetadataPath(
+function formatValidationPath(path: ValidationPath) {
+  return path.length === 0
+    ? "$"
+    : path
+        .map((segment) =>
+          typeof segment === "number" ? `[${segment}]` : `.${segment}`,
+        )
+        .join("")
+        .replace(/^\./u, "$");
+}
+
+function isMetadataId(value: string) {
+  return /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u.test(value);
+}
+
+function collectDefinitionMetadataIssues(
   value: JsonObject,
-  path: string,
-): string | undefined {
+  path: ValidationPath,
+  issues: GeneratorDefinitionFailure[],
+  isDefinition: boolean,
+): void {
+  if (isDefinition) {
+    if (!Object.hasOwn(value, "type")) {
+      issues.push(
+        definitionFailure(
+          "generator_type_missing",
+          appendPathSegment(path, "type"),
+        ),
+      );
+    } else if (
+      typeof value.type !== "string" ||
+      value.type.trim().length === 0
+    ) {
+      issues.push(
+        definitionFailure(
+          "generator_type_invalid",
+          appendPathSegment(path, "type"),
+        ),
+      );
+    }
+    for (const key of Object.keys(value)) {
+      if (key !== "type" && DOCUMENT_METADATA_KEYS.has(key)) {
+        issues.push(
+          definitionFailure(
+            "definition_document_metadata",
+            appendPathSegment(path, key),
+          ),
+        );
+      }
+    }
+  }
+
   for (const [key, child] of Object.entries(value)) {
     if (key === "type") continue;
-
-    const childPath = appendPathSegment(path, key);
-    const metadataPath = findDefinitionMetadataPath(child, childPath);
-    if (metadataPath !== undefined) return metadataPath;
+    collectNestedDefinitionMetadataIssues(
+      child,
+      appendPathSegment(path, key),
+      issues,
+    );
   }
-
-  return undefined;
 }
 
-function findDefinitionMetadataPath(
+function collectNestedDefinitionMetadataIssues(
   value: JsonValue,
-  path: string,
-): string | undefined {
+  path: ValidationPath,
+  issues: GeneratorDefinitionFailure[],
+): void {
   if (Array.isArray(value)) {
     for (let index = 0; index < value.length; index += 1) {
-      const metadataPath = findDefinitionMetadataPath(
+      collectNestedDefinitionMetadataIssues(
         value[index],
-        `${path}[${index}]`,
+        appendPathSegment(path, index),
+        issues,
       );
-      if (metadataPath !== undefined) return metadataPath;
     }
-    return undefined;
+    return;
   }
-
-  if (!isJsonRecord(value)) return undefined;
-
-  if (typeof value.type === "string") {
-    const metadataKey = Object.keys(value).find(
-      (key) => key !== "type" && DOCUMENT_METADATA_KEYS.has(key),
-    );
-    if (metadataKey !== undefined) return appendPathSegment(path, metadataKey);
-  }
-
-  return findNestedDefinitionMetadataPath(value, path);
+  if (!isJsonRecord(value)) return;
+  collectDefinitionMetadataIssues(
+    value,
+    path,
+    issues,
+    Object.hasOwn(value, "type"),
+  );
 }
+
 function isJsonRecord(value: unknown): value is Record<string, unknown> {
   const prototype =
     typeof value === "object" && value !== null
@@ -411,9 +654,9 @@ function isJsonRecord(value: unknown): value is Record<string, unknown> {
 }
 function findJsonValueErrorInternal(
   value: unknown,
-  path: string,
+  path: ValidationPath,
   ancestors: Set<object>,
-): { path: string; reason: string } | undefined {
+): { path: ValidationPath; reason: string } | undefined {
   switch (typeof value) {
     case "boolean":
     case "string":
@@ -437,9 +680,9 @@ function findJsonValueErrorInternal(
 }
 function findJsonObjectError(
   value: object,
-  path: string,
+  path: ValidationPath,
   ancestors: Set<object>,
-): { path: string; reason: string } | undefined {
+): { path: ValidationPath; reason: string } | undefined {
   if (ancestors.has(value))
     return { path, reason: "cyclic objects are not JSON-compatible" };
   if (
@@ -456,13 +699,13 @@ function findJsonObjectError(
 }
 function findJsonArrayError(
   value: readonly unknown[],
-  path: string,
+  path: ValidationPath,
   ancestors: Set<object>,
-): { path: string; reason: string } | undefined {
+): { path: ValidationPath; reason: string } | undefined {
   const extraProperty = Object.keys(value).find((key) => !isArrayIndexKey(key));
   if (extraProperty !== undefined)
     return {
-      path: `${path}.${extraProperty}`,
+      path: appendPathSegment(path, extraProperty),
       reason: "array object properties would be omitted from JSON",
     };
   const propertyError = findUnsupportedOwnProperty(value, path, ["length"]);
@@ -470,12 +713,12 @@ function findJsonArrayError(
   for (let index = 0; index < value.length; index += 1) {
     if (!(index in value))
       return {
-        path: `${path}[${index}]`,
+        path: appendPathSegment(path, index),
         reason: "sparse array slots are not JSON-compatible",
       };
     const itemError = findJsonValueErrorInternal(
       value[index],
-      `${path}[${index}]`,
+      appendPathSegment(path, index),
       ancestors,
     );
     if (itemError !== undefined) return itemError;
@@ -493,9 +736,9 @@ function isArrayIndexKey(key: string) {
 }
 function findJsonRecordError(
   value: object,
-  path: string,
+  path: ValidationPath,
   ancestors: Set<object>,
-): { path: string; reason: string } | undefined {
+): { path: ValidationPath; reason: string } | undefined {
   const prototype = Object.getPrototypeOf(value);
   if (prototype !== null && prototype !== Object.prototype)
     return { path, reason: "object must be a plain JSON record" };
@@ -504,7 +747,7 @@ function findJsonRecordError(
   for (const key of Object.keys(value)) {
     const itemError = findJsonValueErrorInternal(
       (value as Record<string, unknown>)[key],
-      `${path}.${key}`,
+      appendPathSegment(path, key),
       ancestors,
     );
     if (itemError !== undefined) return itemError;
@@ -513,9 +756,9 @@ function findJsonRecordError(
 }
 function findUnsupportedOwnProperty(
   value: object,
-  path: string,
+  path: ValidationPath,
   allowedNonEnumerableProperties: readonly string[] = [],
-): { path: string; reason: string } | undefined {
+): { path: ValidationPath; reason: string } | undefined {
   if (Object.hasOwn(value, "__proto__")) {
     return {
       path: appendPathSegment(path, "__proto__"),
@@ -530,12 +773,12 @@ function findUnsupportedOwnProperty(
   )) {
     if ("get" in descriptor || "set" in descriptor)
       return {
-        path: `${path}.${key}`,
+        path: appendPathSegment(path, key),
         reason: "accessor properties are not portable JSON data",
       };
     if (!descriptor.enumerable && !allowed.has(key))
       return {
-        path: `${path}.${key}`,
+        path: appendPathSegment(path, key),
         reason: "non-enumerable properties would be omitted from JSON",
       };
   }
