@@ -4,6 +4,12 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "imports": {
+    "constructa-core": "jsr:@constructa/core@^0.5.0",
+    "constructa-exporters": "jsr:@constructa/exporters@^0.0.1",
+    "constructa-generators": "jsr:@constructa/generators@^0.0.12",
+    "constructa-schema": "jsr:@constructa/schema@^2.2.0"
+  },
   "publish": {
     "include": ["src", "README.md", "package.json"],
     "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts"]
