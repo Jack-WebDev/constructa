@@ -1,6 +1,6 @@
 {
   "name": "constructa-schema",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Portable schemas and types for Constructa generator definitions.",
   "private": false,
   "license": "MIT",
