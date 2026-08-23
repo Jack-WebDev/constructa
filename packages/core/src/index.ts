@@ -777,7 +777,7 @@ export function invokeGeneratorImplementation<
     if (issue !== undefined) {
       throw new ConstructaError({
         kind: "configuration",
-        code: "INVALID_CONFIGURATION",
+        code: errorCodeForValidationIssue(issue.code),
         path: [...path, ...issue.path],
         message: issue.message,
         details: { issueCode: issue.code },
@@ -947,7 +947,7 @@ function visitRuntimeDefinition(
     addParseIssue(
       issues,
       limits,
-      "INVALID_CONFIGURATION",
+      errorCodeForValidationIssue(issue.code),
       [...path, ...issue.path],
       issue.message,
     );
@@ -1100,7 +1100,9 @@ function validationIssuesToErrors(
     (issue) =>
       new ConstructaError({
         kind: "configuration",
-        code: "INVALID_CONFIGURATION",
+        code: isValidationIssue(issue)
+          ? errorCodeForValidationIssue(issue.code)
+          : "INVALID_CONFIGURATION",
         path: isValidationIssue(issue) ? issue.path : fallbackPath,
         message: isValidationIssue(issue)
           ? issue.message
@@ -1110,6 +1112,15 @@ function validationIssuesToErrors(
           : undefined,
       }),
   );
+}
+
+function errorCodeForValidationIssue(code: string): Uppercase<string> {
+  const reservedCodes: Record<string, Uppercase<string>> = {
+    empty_choice: "EMPTY_CHOICE",
+    invalid_length: "INVALID_LENGTH",
+    invalid_range: "INVALID_RANGE",
+  };
+  return reservedCodes[code] ?? "INVALID_CONFIGURATION";
 }
 
 function isValidationIssue(value: unknown): value is ValidationIssue {
