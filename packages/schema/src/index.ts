@@ -105,8 +105,19 @@ export const CURRENT_SCHEMA_VERSION = 1;
 export const SUPPORTED_SCHEMA_VERSIONS = [CURRENT_SCHEMA_VERSION] as const;
 export type SchemaVersion = (typeof SUPPORTED_SCHEMA_VERSIONS)[number];
 
-/** Portable executable generator data. Generator fields live beside `type`. */
-export type GeneratorDefinition = JsonObject & { readonly type: string };
+declare const generatorOutput: unique symbol;
+
+/**
+ * Portable executable generator data. `Output` exists only to carry compile-time
+ * inference and never creates a runtime property.
+ */
+export type GeneratorDefinition<Output = unknown> = JsonObject & {
+  readonly type: string;
+  readonly [generatorOutput]?: Output;
+};
+
+export type Infer<Definition> =
+  Definition extends GeneratorDefinition<infer Output> ? Output : never;
 
 /** Versioned document containing exactly one root generator definition. */
 export type GeneratorDocumentV1 = {
