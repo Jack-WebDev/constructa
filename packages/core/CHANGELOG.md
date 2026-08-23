@@ -1,5 +1,11 @@
 # constructa-core
 
+## 0.9.0
+
+### Minor Changes
+
+- f60a58b: Add bounded untrusted-definition parsing and cancellation/deadline execution controls.
+
 ## 0.8.2
 
 ### Patch Changes
