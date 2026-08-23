@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   assertDocument,
@@ -10,7 +10,6 @@ import {
   GENERATOR_DOCUMENT_TOP_LEVEL_KEYS,
   type GeneratorDefinition,
   GeneratorDocumentError,
-  type GeneratorDocumentV1,
   GeneratorMetadataError,
   isDocument,
   isGeneratorDefinition,
@@ -19,35 +18,17 @@ import {
   JsonValueError,
   normalizeConstructaError,
   parseDocument,
+  SERIALIZATION_DEFINITION_FIXTURES,
+  SERIALIZATION_DOCUMENT_FIXTURES,
   safeParseDocument,
+  serializeDefinition,
+  serializeDocument,
   type ValidationPath,
   validateDocument,
   validateGeneratorDefinition,
   validateGeneratorMetadata,
   validateJsonValue,
 } from "./index";
-
-const documents: readonly GeneratorDocumentV1[] = [
-  { schemaVersion: 1, definition: { type: "boolean" } },
-  {
-    schemaVersion: 1,
-    name: "Small integer",
-    description: "An integer in a bounded range.",
-    definition: { type: "integer", min: 1, max: 100 },
-  },
-  {
-    schemaVersion: 1,
-    definition: {
-      type: "object",
-      fields: {
-        account: {
-          type: "object",
-          fields: { id: { type: "integer", min: 1 } },
-        },
-      },
-    },
-  },
-];
 
 function sparseArray() {
   const value = new Array<unknown>(2);
@@ -310,15 +291,18 @@ describe("generator documents", () => {
     ]);
   });
 
-  it.each(documents)("parses and JSON round-trips documents", (document) => {
-    expect(isDocument(document)).toBe(true);
-    expect(parseDocument(document)).toBe(document);
-    const decoded = JSON.parse(JSON.stringify(document));
-    expect(parseDocument(decoded)).toEqual(document);
-    expect(decoded.definition).not.toHaveProperty("schemaVersion");
-    expect(decoded.definition).not.toHaveProperty("name");
-    expect(decoded.definition).not.toHaveProperty("description");
-  });
+  it.each(SERIALIZATION_DOCUMENT_FIXTURES)(
+    "parses and JSON round-trips documents",
+    (document) => {
+      expect(isDocument(document)).toBe(true);
+      expect(parseDocument(document)).toBe(document);
+      const decoded = JSON.parse(JSON.stringify(document));
+      expect(parseDocument(decoded)).toEqual(document);
+      expect(decoded.definition).not.toHaveProperty("schemaVersion");
+      expect(decoded.definition).not.toHaveProperty("name");
+      expect(decoded.definition).not.toHaveProperty("description");
+    },
+  );
 
   it("allows empty display metadata without normalization", () => {
     expect(
@@ -415,5 +399,77 @@ describe("generator documents", () => {
       }),
     });
     expect(() => assertDocument(oldEnvelope)).toThrow(GeneratorDocumentError);
+  });
+});
+
+describe("schema serialization", () => {
+  it("serializes definitions with stable recursively sorted keys", () => {
+    const definition = {
+      type: "object",
+      fields: {
+        zebra: { type: "integer", max: 2, min: 1 },
+        alpha: { type: "boolean" },
+      },
+    };
+
+    expectTypeOf(serializeDefinition(definition)).toEqualTypeOf<string>();
+    expect(serializeDefinition(definition)).toBe(`{
+  "fields": {
+    "alpha": {
+      "type": "boolean"
+    },
+    "zebra": {
+      "max": 2,
+      "min": 1,
+      "type": "integer"
+    }
+  },
+  "type": "object"
+}
+`);
+  });
+
+  it.each(SERIALIZATION_DEFINITION_FIXTURES)(
+    "round-trips shared definition fixtures",
+    (definition) => {
+      const serialized = serializeDefinition(definition);
+      expect(JSON.parse(serialized)).toEqual(definition);
+      expect(serializeDefinition(JSON.parse(serialized))).toBe(serialized);
+    },
+  );
+
+  it.each(SERIALIZATION_DOCUMENT_FIXTURES)(
+    "round-trips shared document fixtures",
+    (document) => {
+      const serialized = serializeDocument(document);
+      expect(JSON.parse(serialized)).toEqual(document);
+      expect(serializeDocument(JSON.parse(serialized))).toBe(serialized);
+    },
+  );
+
+  it("uses the same validation errors as definitions and documents", () => {
+    expect(() => serializeDefinition({ value: 1 })).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: ["type"],
+      }),
+    );
+    expect(() =>
+      serializeDocument({ schemaVersion: 1, definition: [] }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: ["definition"],
+      }),
+    );
+    expect(() => serializeDocument({ id: "generated-result" })).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: ["id"],
+      }),
+    );
   });
 });

@@ -129,6 +129,38 @@ export type GeneratorDocumentV1 = {
 
 export type GeneratorDocument = GeneratorDocumentV1;
 
+/** Reusable portable definitions for serialization and integration fixtures. */
+export const SERIALIZATION_DEFINITION_FIXTURES: readonly GeneratorDefinition[] =
+  Object.freeze([
+    Object.freeze({ type: "boolean" }) as GeneratorDefinition,
+    Object.freeze({
+      type: "object",
+      fields: Object.freeze({
+        account: Object.freeze({
+          type: "object",
+          fields: Object.freeze({
+            id: Object.freeze({ type: "integer", min: 1 }),
+          }),
+        }),
+      }),
+    }) as GeneratorDefinition,
+  ]);
+
+/** Reusable versioned documents for serialization and integration fixtures. */
+export const SERIALIZATION_DOCUMENT_FIXTURES: readonly GeneratorDocumentV1[] =
+  Object.freeze([
+    Object.freeze({
+      schemaVersion: 1,
+      definition: SERIALIZATION_DEFINITION_FIXTURES[0] as GeneratorDefinition,
+    }) as GeneratorDocumentV1,
+    Object.freeze({
+      schemaVersion: 1,
+      name: "Small integer",
+      description: "An integer in a bounded range.",
+      definition: Object.freeze({ type: "integer", min: 1, max: 100 }),
+    }) as GeneratorDocumentV1,
+  ]);
+
 /** A stable, lowercase identifier used to classify portable metadata. */
 export type SemanticMetadataId = string;
 
@@ -389,6 +421,37 @@ export function safeParseDocument(
   return failure === undefined
     ? { success: true, value: value as GeneratorDocumentV1 }
     : { success: false, failure };
+}
+
+/**
+ * Serializes a portable definition with recursively sorted object keys and a
+ * trailing newline. The result is intended for stable diffs, not execution.
+ */
+export function serializeDefinition(value: unknown): string {
+  assertGeneratorDefinition(value);
+  return serializeCanonicalJson(value);
+}
+
+/** Serializes a validated versioned document using the same canonical format. */
+export function serializeDocument(value: unknown): string {
+  assertDocument(value);
+  return serializeCanonicalJson(value);
+}
+
+function serializeCanonicalJson(value: JsonValue): string {
+  return `${JSON.stringify(canonicalizeJson(value), null, 2)}\n`;
+}
+
+function canonicalizeJson(value: JsonValue): JsonValue {
+  if (Array.isArray(value)) return value.map(canonicalizeJson);
+  if (isJsonRecord(value)) {
+    const result: Record<string, JsonValue> = {};
+    for (const key of Object.keys(value).sort()) {
+      result[key] = canonicalizeJson(value[key] as JsonValue);
+    }
+    return result;
+  }
+  return value;
 }
 
 export function validateJsonValue(
