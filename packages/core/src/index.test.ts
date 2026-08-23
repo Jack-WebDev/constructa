@@ -5,12 +5,16 @@ import {
   createGeneratorDefinition,
   createRandomSource,
   createRegistry,
+  createSeededRandom,
   defineGenerator,
   type GenerationContext,
   type GeneratorDefinition,
   type GeneratorImplementation,
+  getSeededRandomMetadata,
   type Infer,
   invokeGeneratorImplementation,
+  normalizeSeed,
+  type Seed,
 } from "./index";
 
 type IntegerDefinition<Minimum extends number = number> =
@@ -286,6 +290,97 @@ describe("random sources", () => {
     expect(() => source.bytes(-1)).toThrow(
       expect.objectContaining({ code: "INVALID_RANDOM_SOURCE" }),
     );
+  });
+});
+
+describe("seeded random sources", () => {
+  function sequence(seed: number | string) {
+    const source = createSeededRandom(seed);
+    return {
+      floats: [source.float(), source.float()],
+      integers: [source.integer(1_000), source.integer(1_000)],
+      bytes: [...source.bytes(8)],
+    };
+  }
+
+  it.each([
+    [
+      "",
+      {
+        floats: [0.41053841243665934, 0.028399092828827688],
+        integers: [144, 654],
+        bytes: [239, 128, 246, 106, 85, 161, 182, 194],
+      },
+    ],
+    [
+      0,
+      {
+        floats: [0.8912590515490286, 0.7996191326779422],
+        integers: [369, 700],
+        bytes: [0, 155, 198, 163, 136, 59, 187, 16],
+      },
+    ],
+    [
+      "😀",
+      {
+        floats: [0.3146099011913387, 0.3388515190522643],
+        integers: [784, 567],
+        bytes: [103, 158, 159, 32, 13, 53, 243, 198],
+      },
+    ],
+  ] as const)(
+    "matches the versioned golden sequence for %j",
+    (seed, expected) => {
+      expect(sequence(seed)).toEqual(expected);
+    },
+  );
+
+  it("normalizes supported seed forms explicitly", () => {
+    expect(normalizeSeed(0)).toBe("number:0");
+    expect(normalizeSeed(-0)).toBe("number:0");
+    expect(normalizeSeed(Number.MAX_VALUE)).toBe(`number:${Number.MAX_VALUE}`);
+    expect(normalizeSeed("")).toBe("string:");
+    expect(normalizeSeed("😀")).toBe("string:😀");
+    expect(sequence(-0)).toEqual(sequence(0));
+  });
+
+  it("rejects unsupported seed values with configuration errors", () => {
+    expect(() => createSeededRandom(true as unknown as Seed)).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_SEED",
+        path: ["seed"],
+      }),
+    );
+    expect(() => createSeededRandom(Number.NaN)).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_SEED",
+        path: ["seed"],
+      }),
+    );
+    expect(() => createSeededRandom(Number.POSITIVE_INFINITY)).toThrow(
+      expect.objectContaining({ code: "INVALID_SEED" }),
+    );
+  });
+
+  it("keeps independently created sources deterministic and isolated", () => {
+    const first = createSeededRandom("same");
+    const second = createSeededRandom("same");
+    const different = createSeededRandom("different");
+
+    expect(first.float()).toBe(second.float());
+    expect(first.integer(1_000)).toBe(second.integer(1_000));
+    expect([...first.bytes(4)]).toEqual([...second.bytes(4)]);
+    expect(different.float()).not.toBe(createSeededRandom("same").float());
+  });
+
+  it("exposes algorithm metadata without serializing a seed", () => {
+    const metadata = getSeededRandomMetadata();
+
+    expect(metadata).toEqual({ algorithm: "mulberry32", version: 1 });
+    expect(JSON.stringify(metadata)).not.toContain("seed");
+    expect(Object.isFrozen(metadata)).toBe(true);
   });
 });
 
