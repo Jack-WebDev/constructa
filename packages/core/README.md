@@ -19,7 +19,7 @@ Current APIs define trusted generator implementations, portable typed definition
 
 Use `defineGenerator()` for developer-authored executable implementations. An implementation declares a stable lowercase `type`, positive integer `version`, definition validator, optional dependency analysis hook, and `generate({ definition, context })` function. Validation returns schema `ValidationIssue` objects without imposing a validation-library dependency.
 
-`GeneratorDefinition<Output>` carries output information only at compile time; emitted definitions remain plain JSON data. Factories should use `createGeneratorDefinition()` so literal fields are preserved and the resulting definition is portable. Implementations receive a frozen `GenerationContext` capability view: validated random draws, the current definition path, and typed `executeChild(definition, pathSegment)`. Child dispatch deliberately reports `CHILD_EXECUTION_UNAVAILABLE` until Phase 017 wires recursive execution; implementations must not use global randomness or built-in-specific execution switches.
+`GeneratorDefinition<Output>` carries output information only at compile time; emitted definitions remain plain JSON data. Factories should use `createGeneratorDefinition()` so literal fields are preserved and the resulting definition is portable. Implementations receive a frozen `GenerationContext` capability view: validated random draws, the current definition path, and typed `executeChild(definition, pathSegment)`. Child dispatch uses the executor's registry snapshot, inherits the root random source, and appends exactly one path segment; implementations must not use global randomness or built-in-specific execution switches.
 
 ## Runtime parsing
 
@@ -37,7 +37,7 @@ Use `parseDefinition(value, { registry, limits? })` for untrusted runtime defini
 
 ## Single-value execution
 
-`createExecutor(registry)` is advanced infrastructure for executing one root definition. It snapshots the supplied registry, parses untrusted definitions, runs dependency analysis, and dispatches the resolved implementation. Its `generate(definition, options?)` method returns the definition's inferred output type. Supply either `{ seed }` for a fresh reproducible source or `{ random }` for a caller-owned injected source; supplying both is invalid. Definitions returned by `parseDefinition()` are recognized by the executor and are not validated again, while ordinary definitions are parsed once before dispatch. Child execution and bulk output are intentionally not part of this boundary.
+`createExecutor(registry)` is advanced infrastructure for executing one root definition. It snapshots the supplied registry, parses untrusted definitions, runs dependency analysis, and dispatches the resolved implementation. Its `generate(definition, options?)` method returns the definition's inferred output type. Supply either `{ seed }` for a fresh reproducible source or `{ random }` for a caller-owned injected source; supplying both is invalid. Definitions returned by `parseDefinition()` are recognized by the executor and are not validated again, while ordinary definitions are parsed once before dispatch. `maxDepth` bounds recursive child execution (default: 64). Bulk output is intentionally not part of this boundary.
 
 ## Dependency Boundary
 
