@@ -1,5 +1,11 @@
 # constructa-core
 
+## 0.4.0
+
+### Minor Changes
+
+- 5ea9792: Add validated random sources with platform-backed floats, unbiased bounded integers, and byte generation.
+
 ## 0.3.0
 
 ### Minor Changes
