@@ -1,5 +1,11 @@
 # constructa-core
 
+## 0.5.0
+
+### Minor Changes
+
+- 803c506: Add versioned seeded random sources and determinism compatibility metadata.
+
 ## 0.4.0
 
 ### Minor Changes
