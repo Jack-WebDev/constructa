@@ -5,11 +5,22 @@ import {
   type BooleanDefinition,
   boolean,
   booleanGenerator,
+  choice,
+  type DateDefinition,
+  type DecimalDefinition,
+  date,
+  decimal,
   type IntegerDefinition,
   integer,
   integerGenerator,
   registerBooleanGenerator,
+  registerChoiceGenerator,
+  registerDateGenerator,
+  registerDecimalGenerator,
   registerIntegerGenerator,
+  registerStringGenerator,
+  type StringDefinition,
+  string,
 } from "./index";
 
 describe("integer", () => {
@@ -138,5 +149,158 @@ describe("boolean", () => {
         path: ["unexpected"],
       }),
     );
+  });
+});
+
+describe("choice", () => {
+  it("preserves literal unions and selects the first and last values", () => {
+    const definition = choice(["admin", "member"]);
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    const executor = createExecutor(registry);
+    const random = (index: number) => ({
+      float: () => 0,
+      integer: () => index,
+      bytes: (length: number) => new Uint8Array(length),
+    });
+
+    expectTypeOf<Infer<typeof definition>>().toEqualTypeOf<
+      "admin" | "member"
+    >();
+    expect(executor.generate(definition, { random: random(0) })).toBe("admin");
+    expect(executor.generate(definition, { random: random(1) })).toBe("member");
+  });
+
+  it("supports every JSON value and rejects empty or non-portable choices", () => {
+    const definition = choice([1, true, null, { role: "admin" }, ["nested"]]);
+    expectTypeOf<Infer<typeof definition>>().toEqualTypeOf<
+      1 | true | null | { readonly role: "admin" } | readonly ["nested"]
+    >();
+    expect(definition.values).toHaveLength(5);
+    expect(() => choice([])).toThrow(
+      expect.objectContaining({ code: "EMPTY_CHOICE", path: ["values"] }),
+    );
+    expect(() => choice([() => "not JSON"] as never)).toThrow(
+      expect.objectContaining({
+        code: "INVALID_CONFIGURATION",
+        path: ["values", 0],
+      }),
+    );
+  });
+});
+
+describe("decimal", () => {
+  it("rounds finite values to the requested precision", () => {
+    const definition = decimal({ min: 1.234, max: 1.234, precision: 2 });
+    const registry = createRegistry();
+    registerDecimalGenerator(registry);
+
+    expectTypeOf<Infer<typeof definition>>().toEqualTypeOf<number>();
+    expectTypeOf(definition).toEqualTypeOf<DecimalDefinition>();
+    expect(
+      createExecutor(registry).generate(definition, {
+        random: {
+          float: () => 0,
+          integer: () => 0,
+          bytes: (length) => new Uint8Array(length),
+        },
+      }),
+    ).toBe(1.23);
+  });
+
+  it.each([
+    [{ min: Number.NaN, max: 1, precision: 2 }, ["min"]],
+    [{ min: 2, max: 1, precision: 2 }, ["max"]],
+    [{ min: 0, max: 1, precision: 16 }, ["precision"]],
+  ])("rejects invalid decimal options", (options, path) => {
+    expect(() => decimal(options as never)).toThrow(
+      expect.objectContaining({ path }),
+    );
+  });
+});
+
+describe("string", () => {
+  it("uses the explicit alphanumeric default and custom character sets", () => {
+    const registry = createRegistry();
+    registerStringGenerator(registry);
+    const executor = createExecutor(registry);
+    const defaultDefinition = string({ length: 2 });
+    const customDefinition = string({ length: 3, charset: "XY" });
+    const random = {
+      float: () => 0,
+      integer: () => 1,
+      bytes: (length: number) => new Uint8Array(length),
+    };
+
+    expectTypeOf<Infer<typeof defaultDefinition>>().toEqualTypeOf<string>();
+    expectTypeOf(defaultDefinition).toEqualTypeOf<StringDefinition>();
+    expect(defaultDefinition.charset).toBe("alphanumeric");
+    expect(executor.generate(customDefinition, { random })).toBe("YYY");
+  });
+
+  it.each([
+    [{ length: -1 }, ["length"]],
+    [{ length: 10_001 }, ["length"]],
+    [{ length: 1, charset: "" }, ["charset"]],
+  ])("rejects invalid string options", (options, path) => {
+    expect(() => string(options as never)).toThrow(
+      expect.objectContaining({ path }),
+    );
+  });
+});
+
+describe("date", () => {
+  it("uses inclusive timezone-independent calendar-day arithmetic", () => {
+    const definition = date({ min: "2024-02-28", max: "2024-03-01" });
+    const registry = createRegistry();
+    registerDateGenerator(registry);
+    const executor = createExecutor(registry);
+    const random = (value: number) => ({
+      float: () => 0,
+      integer: () => value,
+      bytes: (length: number) => new Uint8Array(length),
+    });
+
+    expectTypeOf<Infer<typeof definition>>().toEqualTypeOf<string>();
+    expectTypeOf(definition).toEqualTypeOf<DateDefinition>();
+    expect(executor.generate(definition, { random: random(0) })).toBe(
+      "2024-02-28",
+    );
+    expect(executor.generate(definition, { random: random(2) })).toBe(
+      "2024-03-01",
+    );
+  });
+
+  it.each([
+    [{ min: "2024-02-30", max: "2024-03-01" }, ["min"]],
+    [{ min: "2024-2-01", max: "2024-03-01" }, ["min"]],
+    [{ min: "2024-03-02", max: "2024-03-01" }, ["min"]],
+  ])("rejects invalid date ranges", (options, path) => {
+    expect(() => date(options as never)).toThrow(
+      expect.objectContaining({ code: "INVALID_RANGE", path }),
+    );
+  });
+});
+
+describe("seeded primitive generation", () => {
+  it("reproduces choice, decimal, string, and date values for the same seed", () => {
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    registerDecimalGenerator(registry);
+    registerStringGenerator(registry);
+    registerDateGenerator(registry);
+    const executor = createExecutor(registry);
+    const definitions = [
+      choice(["first", "second", "third"]),
+      decimal({ min: -10, max: 10, precision: 3 }),
+      string({ length: 12, charset: "hex" }),
+      date({ min: "2024-01-01", max: "2024-12-31" }),
+    ];
+
+    for (const definition of definitions) {
+      expect(executor.generate(definition, { seed: "repeatable" })).toEqual(
+        executor.generate(definition, { seed: "repeatable" }),
+      );
+    }
   });
 });
