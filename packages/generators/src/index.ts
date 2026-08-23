@@ -1,9 +1,11 @@
 import {
+  createCompositeDependencyAnalysis,
   createGeneratorDefinition,
   defineGenerator,
   type GeneratorDefinition,
   type GeneratorImplementation,
   type GeneratorRegistry,
+  scheduleCompositeDependencies,
   type ValidationIssue,
 } from "constructa-core";
 import {
@@ -85,9 +87,24 @@ export const objectGenerator: GeneratorImplementation<
   version: 1,
   validateDefinition: validateObjectDefinition,
   generate({ definition, context }) {
+    const fields = Object.entries(definition.fields);
+    const children = new Map(fields);
+    const completed = new Map<string, unknown>();
+    const dependencies = createCompositeDependencyAnalysis(
+      fields.map(([key, child]) => ({
+        fieldPath: [key] as const,
+        dependencies: context.analyzeChildValueDependencies(child, key),
+      })),
+    );
+    const scope = context.createObjectScope();
+    for (const key of scheduleCompositeDependencies(dependencies)) {
+      const child = children.get(key);
+      if (child === undefined) continue;
+      completed.set(key, scope.executeChild(child, key));
+    }
     const result: Record<string, unknown> = {};
-    for (const [key, child] of Object.entries(definition.fields)) {
-      result[key] = context.executeChild(child, key);
+    for (const [key] of fields) {
+      result[key] = completed.get(key);
     }
     return result;
   },

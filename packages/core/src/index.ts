@@ -231,12 +231,59 @@ export type GenerationContext = {
     definition: GeneratorDefinition<Output>,
     pathSegment: ValidationPathSegment,
   ) => Output;
+  /**
+   * Read-only values from the object currently being generated. Values are
+   * available only after their field has completed.
+   */
+  readonly references: ReferenceResolver;
+  /** Creates an isolated scope for the fields of one composite object. */
+  readonly createObjectScope: () => ObjectGenerationScope;
+  /** Returns value dependencies declared by one direct child definition. */
+  readonly analyzeChildValueDependencies: (
+    definition: GeneratorDefinition,
+    pathSegment: ValidationPathSegment,
+  ) => readonly ValueDependency[];
+};
+
+/** A property path relative to the object containing a reference. */
+export type ReferencePath = readonly string[];
+
+/** A portable value dependency declared by a generator definition. */
+export type ValueDependency = {
+  readonly path: ReferencePath;
+};
+
+/** Dependencies for a direct field in a composite definition. */
+export type CompositeDependencyNode = {
+  readonly fieldPath: readonly [string];
+  readonly dependencies: readonly ValueDependency[];
+};
+
+/** Portable dependency data used to schedule one composite object. */
+export type CompositeDependencyAnalysis = {
+  readonly nodes: readonly CompositeDependencyNode[];
+};
+
+/** The read-only capability supplied to generators that resolve references. */
+export type ReferenceResolver = {
+  resolve: (path: ReferencePath) => unknown;
+};
+
+/** Executes and records completed fields within one isolated object scope. */
+export type ObjectGenerationScope = {
+  executeChild: <Output>(
+    definition: GeneratorDefinition<Output>,
+    pathSegment: string,
+  ) => Output;
 };
 
 export type GenerationContextOptions = {
   readonly random: RandomSource;
   readonly path?: ValidationPath;
   readonly executeChild?: GenerationContext["executeChild"];
+  readonly references?: ReferenceResolver;
+  readonly createObjectScope?: GenerationContext["createObjectScope"];
+  readonly analyzeChildValueDependencies?: GenerationContext["analyzeChildValueDependencies"];
 };
 
 /**
@@ -284,7 +331,145 @@ export function createGenerationContext(
       });
     });
 
-  return Object.freeze({ random, path, executeChild });
+  const references = options.references ?? unavailableReferenceResolver(path);
+  if (
+    typeof references !== "object" ||
+    references === null ||
+    typeof references.resolve !== "function"
+  ) {
+    throw contextError(
+      "INVALID_GENERATION_CONTEXT",
+      [],
+      "references must provide a resolve function when present.",
+    );
+  }
+  const createObjectScope =
+    options.createObjectScope ??
+    (() =>
+      Object.freeze({
+        executeChild<Output>(
+          definition: GeneratorDefinition<Output>,
+          pathSegment: string,
+        ): Output {
+          return executeChild(definition, pathSegment);
+        },
+      }));
+  if (typeof createObjectScope !== "function") {
+    throw contextError(
+      "INVALID_GENERATION_CONTEXT",
+      [],
+      "createObjectScope must be a function when present.",
+    );
+  }
+  const analyzeChildValueDependencies =
+    options.analyzeChildValueDependencies ?? (() => []);
+  if (typeof analyzeChildValueDependencies !== "function") {
+    throw contextError(
+      "INVALID_GENERATION_CONTEXT",
+      [],
+      "analyzeChildValueDependencies must be a function when present.",
+    );
+  }
+
+  return Object.freeze({
+    random,
+    path,
+    executeChild,
+    references: Object.freeze({ resolve: references.resolve }),
+    createObjectScope,
+    analyzeChildValueDependencies,
+  });
+}
+
+/** Freezes direct-field dependency declarations into portable analysis data. */
+export function createCompositeDependencyAnalysis(
+  nodes: readonly CompositeDependencyNode[],
+): CompositeDependencyAnalysis {
+  if (!Array.isArray(nodes)) {
+    throw contextError(
+      "INVALID_COMPOSITE_DEPENDENCIES",
+      [],
+      "Composite dependency nodes must be an array.",
+    );
+  }
+  const names = new Set<string>();
+  const normalized = nodes.map((node, index) => {
+    if (!isCompositeDependencyNode(node) || names.has(node.fieldPath[0])) {
+      throw contextError(
+        "INVALID_COMPOSITE_DEPENDENCIES",
+        ["nodes", index],
+        "Each composite dependency node must name one unique field.",
+      );
+    }
+    names.add(node.fieldPath[0]);
+    return Object.freeze({
+      fieldPath: Object.freeze([...node.fieldPath]) as readonly [string],
+      dependencies: Object.freeze(
+        node.dependencies.map((dependency) =>
+          Object.freeze({ path: Object.freeze([...dependency.path]) }),
+        ),
+      ),
+    });
+  });
+  return Object.freeze({ nodes: Object.freeze(normalized) });
+}
+
+/**
+ * Returns a deterministic execution order for direct object fields. A
+ * dependency path may target a nested value below another direct field.
+ */
+export function scheduleCompositeDependencies(
+  analysis: CompositeDependencyAnalysis,
+): readonly string[] {
+  const nodes = analysis.nodes;
+  const byName = new Map(nodes.map((node) => [node.fieldPath[0], node]));
+  const remaining = new Map<string, Set<string>>();
+  const dependents = new Map<string, string[]>();
+
+  for (const node of nodes) {
+    const dependencies = new Set<string>();
+    for (const dependency of node.dependencies) {
+      const target = dependency.path[0];
+      if (target === undefined || !byName.has(target)) {
+        throw new ConstructaError({
+          kind: "dependency",
+          code: "REFERENCE_NOT_FOUND",
+          path: [...node.fieldPath],
+          message: "A referenced object field could not be found.",
+        });
+      }
+      dependencies.add(target);
+      const targets = dependents.get(target) ?? [];
+      targets.push(node.fieldPath[0]);
+      dependents.set(target, targets);
+    }
+    remaining.set(node.fieldPath[0], dependencies);
+  }
+
+  const ready = nodes
+    .filter((node) => (remaining.get(node.fieldPath[0])?.size ?? 0) === 0)
+    .map((node) => node.fieldPath[0]);
+  const ordered: string[] = [];
+  while (ready.length > 0) {
+    const field = ready.shift();
+    if (field === undefined) continue;
+    ordered.push(field);
+    for (const dependent of dependents.get(field) ?? []) {
+      const dependencies = remaining.get(dependent);
+      dependencies?.delete(field);
+      if (dependencies?.size === 0) ready.push(dependent);
+    }
+  }
+  if (ordered.length !== nodes.length) {
+    const field = nodes.find((node) => !ordered.includes(node.fieldPath[0]));
+    throw new ConstructaError({
+      kind: "dependency",
+      code: "CIRCULAR_REFERENCE",
+      path: field?.fieldPath ?? [],
+      message: "Circular object value references were detected.",
+    });
+  }
+  return Object.freeze(ordered);
 }
 
 export type ParseLimits = {
@@ -401,6 +586,10 @@ export type GeneratorImplementation<
   readonly analyzeDependencies?: (
     definition: Definition,
   ) => readonly GeneratorDependency[];
+  /** Declares object-local value references used by this definition. */
+  readonly analyzeValueDependencies?: (
+    definition: Definition,
+  ) => readonly ValueDependency[];
   readonly generate: (input: {
     readonly definition: Definition;
     readonly context: GenerationContext;
@@ -526,6 +715,7 @@ function executeParsedDefinition(
   path: ValidationPath,
   depth: number,
   state: ExecutionState,
+  references: ReferenceResolver = unavailableReferenceResolver(path),
 ): unknown {
   const implementation = state.snapshot.lookup(definition.type, path);
   analyzeGeneratorDependencies(
@@ -537,6 +727,43 @@ function executeParsedDefinition(
   const context = createGenerationContext({
     random: state.random,
     path,
+    references,
+    createObjectScope() {
+      return createObjectGenerationScope(
+        path,
+        (child, pathSegment, scopeReferences) => {
+          assertChildPathSegment(pathSegment, path);
+          const childPath = [...path, pathSegment];
+          if (depth >= state.maxDepth) {
+            throw new ConstructaError({
+              kind: "execution",
+              code: "MAX_EXECUTION_DEPTH",
+              path: childPath,
+              message: "Child execution exceeds the configured maximum depth.",
+            });
+          }
+          const parsed = parseDefinitionAtPath(
+            child,
+            childPath,
+            state.snapshot,
+          );
+          return executeParsedDefinition(
+            parsed,
+            childPath,
+            depth + 1,
+            state,
+            scopeReferences,
+          );
+        },
+      );
+    },
+    analyzeChildValueDependencies(child, pathSegment) {
+      assertChildPathSegment(pathSegment, path);
+      const childPath = [...path, pathSegment];
+      const parsed = parseDefinitionAtPath(child, childPath, state.snapshot);
+      const childImplementation = state.snapshot.lookup(parsed.type, childPath);
+      return analyzeValueDependencies(childImplementation, parsed, childPath);
+    },
     executeChild<Output>(
       child: GeneratorDefinition<Output>,
       pathSegment: ValidationPathSegment,
@@ -557,6 +784,7 @@ function executeParsedDefinition(
         childPath,
         depth + 1,
         state,
+        references,
       ) as Output;
     },
   });
@@ -566,6 +794,94 @@ function executeParsedDefinition(
     context,
     path,
   );
+}
+
+function createObjectGenerationScope(
+  path: ValidationPath,
+  executeChild: (
+    definition: GeneratorDefinition,
+    pathSegment: string,
+    references: ReferenceResolver,
+  ) => unknown,
+): ObjectGenerationScope {
+  const completed = new Map<string, unknown>();
+  const resolver: ReferenceResolver = Object.freeze({
+    resolve(referencePath: ReferencePath): unknown {
+      assertReferencePath(referencePath, path);
+      const key = referencePathKey(referencePath);
+      if (!completed.has(key)) {
+        throw new ConstructaError({
+          kind: "dependency",
+          code: "REFERENCE_NOT_AVAILABLE",
+          path,
+          message: "The referenced object value has not completed.",
+        });
+      }
+      return completed.get(key);
+    },
+  });
+  return Object.freeze({
+    executeChild<Output>(
+      definition: GeneratorDefinition<Output>,
+      pathSegment: string,
+    ): Output {
+      const value = executeChild(definition, pathSegment, resolver) as Output;
+      recordCompletedValue(completed, [pathSegment], value);
+      return value;
+    },
+  });
+}
+
+function recordCompletedValue(
+  completed: Map<string, unknown>,
+  referencePath: readonly string[],
+  value: unknown,
+  visited = new WeakSet<object>(),
+): void {
+  completed.set(referencePathKey(referencePath), value);
+  if (typeof value !== "object" || value === null || visited.has(value)) return;
+  visited.add(value);
+  for (const [key, child] of Object.entries(value)) {
+    recordCompletedValue(completed, [...referencePath, key], child, visited);
+  }
+}
+
+function unavailableReferenceResolver(path: ValidationPath): ReferenceResolver {
+  return Object.freeze({
+    resolve(referencePath: ReferencePath): never {
+      assertReferencePath(referencePath, path);
+      throw new ConstructaError({
+        kind: "dependency",
+        code: "REFERENCE_RESOLUTION_UNAVAILABLE",
+        path,
+        message:
+          "Reference resolution is available only inside an object field.",
+      });
+    },
+  });
+}
+
+function assertReferencePath(
+  referencePath: ReferencePath,
+  contextPath: ValidationPath,
+): void {
+  if (
+    !Array.isArray(referencePath) ||
+    referencePath.length === 0 ||
+    referencePath.some(
+      (segment) => typeof segment !== "string" || segment.length === 0,
+    )
+  ) {
+    throw contextError(
+      "INVALID_REFERENCE_PATH",
+      contextPath,
+      "Reference paths must contain one or more non-empty string segments.",
+    );
+  }
+}
+
+function referencePathKey(path: readonly string[]): string {
+  return JSON.stringify(path);
 }
 
 function createExecutionSnapshot(
@@ -668,6 +984,38 @@ function analyzeGeneratorDependencies(
   }
 }
 
+function analyzeValueDependencies(
+  implementation: GeneratorImplementation<GeneratorDefinition, unknown>,
+  definition: GeneratorDefinition,
+  path: ValidationPath,
+): readonly ValueDependency[] {
+  if (implementation.analyzeValueDependencies === undefined) return [];
+  let dependencies: readonly ValueDependency[];
+  try {
+    dependencies = implementation.analyzeValueDependencies(definition);
+  } catch (cause) {
+    throw normalizeConstructaError(cause, {
+      kind: "dependency",
+      code: "DEPENDENCY_ANALYSIS_FAILED",
+      path,
+      message: "Value dependency analysis failed.",
+    });
+  }
+  if (!Array.isArray(dependencies) || !dependencies.every(isValueDependency)) {
+    throw new ConstructaError({
+      kind: "system",
+      code: "DEPENDENCY_ANALYSIS_FAILED",
+      path,
+      message: "Value dependency analysis returned an invalid result.",
+    });
+  }
+  return Object.freeze(
+    dependencies.map((dependency) =>
+      Object.freeze({ path: Object.freeze([...dependency.path]) }),
+    ),
+  );
+}
+
 function isGeneratorDependency(value: unknown): value is GeneratorDependency {
   return (
     typeof value === "object" &&
@@ -677,6 +1025,32 @@ function isGeneratorDependency(value: unknown): value is GeneratorDependency {
     (value as GeneratorDependency).path.every(
       (segment) => typeof segment === "string" || Number.isSafeInteger(segment),
     )
+  );
+}
+
+function isValueDependency(value: unknown): value is ValueDependency {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as ValueDependency).path) &&
+    (value as ValueDependency).path.length > 0 &&
+    (value as ValueDependency).path.every(
+      (segment) => typeof segment === "string" && segment.length > 0,
+    )
+  );
+}
+
+function isCompositeDependencyNode(
+  value: unknown,
+): value is CompositeDependencyNode {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    Array.isArray((value as CompositeDependencyNode).fieldPath) &&
+    (value as CompositeDependencyNode).fieldPath.length === 1 &&
+    typeof (value as CompositeDependencyNode).fieldPath[0] === "string" &&
+    Array.isArray((value as CompositeDependencyNode).dependencies) &&
+    (value as CompositeDependencyNode).dependencies.every(isValueDependency)
   );
 }
 

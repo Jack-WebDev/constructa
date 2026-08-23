@@ -1,4 +1,10 @@
-import { createExecutor, createRegistry, type Infer } from "constructa-core";
+import {
+  createExecutor,
+  createRegistry,
+  defineGenerator,
+  type GeneratorDefinition,
+  type Infer,
+} from "constructa-core";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
@@ -428,6 +434,109 @@ describe("object", () => {
       }),
     );
   });
+
+  it("schedules forward and backward value dependencies equivalently", () => {
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    registerObjectGenerator(registry);
+    registry.register(referenceGenerator);
+    const executor = createExecutor(registry);
+
+    const forward = object({
+      greeting: reference(["name"]),
+      name: choice(["Ada"]),
+    });
+    const backward = object({
+      name: choice(["Ada"]),
+      greeting: reference(["name"]),
+    });
+
+    expect(executor.generate(forward, { seed: "references" })).toEqual({
+      greeting: "Ada",
+      name: "Ada",
+    });
+    expect(executor.generate(backward, { seed: "references" })).toEqual({
+      name: "Ada",
+      greeting: "Ada",
+    });
+  });
+
+  it("resolves completed nested sibling values", () => {
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    registerObjectGenerator(registry);
+    registry.register(referenceGenerator);
+    const executor = createExecutor(registry);
+    const definition = object({
+      city: reference(["address", "city"]),
+      address: object({ city: choice(["Cape Town"]) }),
+    });
+
+    expect(executor.generate(definition, { seed: 1 })).toEqual({
+      city: "Cape Town",
+      address: { city: "Cape Town" },
+    });
+    expect(executor.generate(definition, { seed: 2 })).toEqual({
+      city: "Cape Town",
+      address: { city: "Cape Town" },
+    });
+  });
+
+  it("keeps object value scopes isolated between executions", () => {
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    registerObjectGenerator(registry);
+    registry.register(referenceGenerator);
+    const executor = createExecutor(registry);
+    const first = object({
+      copy: reference(["value"]),
+      value: choice(["first"]),
+    });
+    const second = object({
+      copy: reference(["value"]),
+      value: choice(["second"]),
+    });
+
+    expect(executor.generate(first, { seed: 1 })).toEqual({
+      copy: "first",
+      value: "first",
+    });
+    expect(executor.generate(second, { seed: 1 })).toEqual({
+      copy: "second",
+      value: "second",
+    });
+  });
+});
+
+type ReferenceDefinition = GeneratorDefinition<string> & {
+  readonly type: "test-reference";
+  readonly reference: readonly string[];
+};
+
+function reference(path: readonly string[]): ReferenceDefinition {
+  return { type: "test-reference", reference: path } as ReferenceDefinition;
+}
+
+const referenceGenerator = defineGenerator({
+  type: "test-reference",
+  version: 1,
+  validateDefinition() {
+    return [];
+  },
+  analyzeValueDependencies(definition: ReferenceDefinition) {
+    return [{ path: definition.reference }];
+  },
+  generate({
+    definition,
+    context,
+  }: {
+    readonly definition: ReferenceDefinition;
+    readonly context: {
+      readonly references: { resolve(path: readonly string[]): unknown };
+    };
+  }) {
+    return String(context.references.resolve(definition.reference));
+  },
 });
 
 describe("array", () => {
