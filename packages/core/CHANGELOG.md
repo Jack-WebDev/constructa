@@ -1,5 +1,11 @@
 # constructa-core
 
+## 0.7.1
+
+### Patch Changes
+
+- 28495a9: Add scalar object-local template interpolation with stable malformed-token validation.
+
 ## 0.7.0
 
 ### Minor Changes
