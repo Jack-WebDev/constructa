@@ -98,14 +98,21 @@ export const objectGenerator: GeneratorImplementation<
       })),
     );
     const scope = context.createObjectScope();
-    for (const key of scheduleCompositeDependencies(dependencies)) {
+    for (const key of scheduleCompositeDependencies(dependencies, {
+      referencePaths: collectObjectReferencePaths(definition.fields),
+    })) {
       const child = children.get(key);
       if (child === undefined) continue;
       completed.set(key, scope.executeChild(child, key));
     }
     const result: Record<string, unknown> = {};
     for (const [key] of fields) {
-      result[key] = completed.get(key);
+      Object.defineProperty(result, key, {
+        value: completed.get(key),
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
     }
     return result;
   },
@@ -536,6 +543,24 @@ function validateTemplateDefinition(
     throw cause;
   }
   return [];
+}
+
+function collectObjectReferencePaths(
+  fields: ObjectFields,
+): readonly string[][] {
+  const paths: string[][] = [];
+  const visit = (definitions: ObjectFields, prefix: readonly string[]) => {
+    for (const [key, definition] of Object.entries(definitions)) {
+      const path = [...prefix, key];
+      paths.push(path);
+      const nestedFields = (definition as { readonly fields?: unknown }).fields;
+      if (definition.type === "object" && isDefinitionRecord(nestedFields)) {
+        visit(nestedFields as ObjectFields, path);
+      }
+    }
+  };
+  visit(fields, []);
+  return paths;
 }
 
 function validateArrayDefinition(value: unknown): readonly ValidationIssue[] {

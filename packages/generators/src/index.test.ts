@@ -610,6 +610,111 @@ describe("template", () => {
       }),
     );
   });
+
+  it("reports missing root and nested references before generating fields", () => {
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    registerObjectGenerator(registry);
+    registerTemplateGenerator(registry);
+    const executor = createExecutor(registry);
+
+    expect(() =>
+      executor.generate(
+        object({ label: template("{surname}"), name: choice(["Ada"]) }),
+        { seed: 1 },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "REFERENCE_NOT_FOUND",
+        path: ["label"],
+        details: { referencePath: ["surname"] },
+      }),
+    );
+    expect(() =>
+      executor.generate(
+        object({
+          label: template("{address.postcode}"),
+          address: object({ city: choice(["Cape Town"]) }),
+        }),
+        { seed: 1 },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "REFERENCE_NOT_FOUND",
+        path: ["label"],
+        details: { referencePath: ["address", "postcode"] },
+      }),
+    );
+  });
+
+  it("reports deterministic self and multi-field reference cycles", () => {
+    const registry = createRegistry();
+    registerObjectGenerator(registry);
+    registerTemplateGenerator(registry);
+    const executor = createExecutor(registry);
+
+    expect(() =>
+      executor.generate(object({ a: template("{a}") }), { seed: 1 }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "CIRCULAR_REFERENCE",
+        path: ["a"],
+        details: { fields: ["a", "a"] },
+      }),
+    );
+    expect(() =>
+      executor.generate(object({ a: template("{b}"), b: template("{a}") }), {
+        seed: 1,
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "CIRCULAR_REFERENCE",
+        path: ["a"],
+        details: { fields: ["a", "b", "a"] },
+      }),
+    );
+    expect(() =>
+      executor.generate(
+        object({
+          c: template("{a}"),
+          a: template("{b}"),
+          b: template("{c}"),
+        }),
+        { seed: 1 },
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "CIRCULAR_REFERENCE",
+        path: ["a"],
+        details: { fields: ["a", "b", "c", "a"] },
+      }),
+    );
+  });
+
+  it("uses field names as the stable tie-breaker for independent fields", () => {
+    const registry = createRegistry();
+    registerChoiceGenerator(registry);
+    registerObjectGenerator(registry);
+    const executor = createExecutor(registry);
+    const first = object({
+      zebra: choice(["z0", "z1"]),
+      alpha: choice(["a0", "a1"]),
+    });
+    const second = object({
+      alpha: choice(["a0", "a1"]),
+      zebra: choice(["z0", "z1"]),
+    });
+
+    const firstResult = executor.generate(first, { seed: "stable-order" });
+    const secondResult = executor.generate(second, { seed: "stable-order" });
+    expect(firstResult.alpha).toBe(secondResult.alpha);
+    expect(firstResult.zebra).toBe(secondResult.zebra);
+  });
 });
 
 type ReferenceDefinition = GeneratorDefinition<string> & {
