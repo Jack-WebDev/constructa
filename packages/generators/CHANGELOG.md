@@ -1,5 +1,13 @@
 # constructa-generators
 
+## 0.3.1
+
+### Patch Changes
+
+- 77259cb: Add object-local value dependency scheduling and read-only reference resolution.
+- Updated dependencies [77259cb]
+  - constructa-core@0.6.0
+
 ## 0.3.0
 
 ### Minor Changes
