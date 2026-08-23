@@ -31,6 +31,8 @@ export type RandomSource = {
 
 export type RandomSourceAdapter = RandomSource;
 
+const validatedRandomSources = new WeakSet<object>();
+
 export type Seed = number | string;
 
 export type ExecutionOptions = {
@@ -41,6 +43,8 @@ export type ExecutionOptions = {
    * reset, clone, or otherwise retain it after the call returns.
    */
   readonly random?: RandomSource;
+  /** Maximum child-definition nesting below the root. Defaults to 64. */
+  readonly maxDepth?: number;
 };
 
 export type Executor = {
@@ -79,7 +83,7 @@ const SEEDED_RANDOM_METADATA: SeededRandomMetadata = Object.freeze({
 export function createRandomSource(adapter: RandomSourceAdapter): RandomSource {
   assertRandomSourceAdapter(adapter);
 
-  return Object.freeze({
+  const source = Object.freeze({
     float() {
       const value = adapter.float();
       if (
@@ -115,6 +119,8 @@ export function createRandomSource(adapter: RandomSourceAdapter): RandomSource {
       return value;
     },
   });
+  validatedRandomSources.add(source);
+  return source;
 }
 
 /** Creates the default platform-backed random source. It makes no security claim. */
@@ -220,10 +226,7 @@ export type GenerationContext = {
   readonly random: RandomSource;
   /** The definition path currently being generated. */
   readonly path: ValidationPath;
-  /**
-   * Delegates a typed child definition to the engine. Phase 017 supplies the
-   * implementation; contexts created before then fail explicitly.
-   */
+  /** Delegates a typed child definition to the engine. */
   readonly executeChild: <Output>(
     definition: GeneratorDefinition<Output>,
     pathSegment: ValidationPathSegment,
@@ -264,7 +267,9 @@ export function createGenerationContext(
   }
 
   // This validates the Phase 012 source contract without drawing from it.
-  const random = createRandomSource(options.random);
+  const random = validatedRandomSources.has(options.random)
+    ? options.random
+    : createRandomSource(options.random);
   const path = Object.freeze([...(options.path ?? [])]);
   const executeChild =
     options.executeChild ??
@@ -314,7 +319,16 @@ export function parseDefinition(
   value: unknown,
   options: ParseDefinitionOptions,
 ): ParsedGeneratorDefinition {
-  const result = safeParseDefinition(value, options);
+  return parseDefinitionAtPath(value, [], options.registry, options.limits);
+}
+
+function parseDefinitionAtPath(
+  value: unknown,
+  path: ValidationPath,
+  registry: ParseDefinitionOptions["registry"],
+  limits?: ParseLimits,
+): ParsedGeneratorDefinition {
+  const result = parseRuntimeDefinition(value, path, { registry, limits });
   if (result.success) return result.value;
   throw result.issues[0];
 }
@@ -489,21 +503,69 @@ export function createExecutor(
       definition: Definition,
       options?: ExecutionOptions,
     ): import("constructa-schema").Infer<Definition> {
-      const random = resolveExecutionRandom(options);
+      const execution = resolveExecutionOptions(options);
       const parsed = parsedDefinitions.has(definition)
         ? definition
         : parseDefinition(definition, { registry: snapshot });
-      const implementation = snapshot.lookup(parsed.type);
-
-      analyzeGeneratorDependencies(implementation, parsed, snapshot);
-      const context = createGenerationContext({ random });
-      return invokeValidatedGeneratorImplementation(
-        implementation,
-        parsed,
-        context,
-      ) as import("constructa-schema").Infer<Definition>;
+      return executeParsedDefinition(parsed, [], 0, {
+        snapshot,
+        ...execution,
+      }) as import("constructa-schema").Infer<Definition>;
     },
   });
+}
+
+type ExecutionState = {
+  readonly snapshot: GeneratorRegistrySnapshot;
+  readonly random: RandomSource;
+  readonly maxDepth: number;
+};
+
+function executeParsedDefinition(
+  definition: GeneratorDefinition,
+  path: ValidationPath,
+  depth: number,
+  state: ExecutionState,
+): unknown {
+  const implementation = state.snapshot.lookup(definition.type, path);
+  analyzeGeneratorDependencies(
+    implementation,
+    definition,
+    state.snapshot,
+    path,
+  );
+  const context = createGenerationContext({
+    random: state.random,
+    path,
+    executeChild<Output>(
+      child: GeneratorDefinition<Output>,
+      pathSegment: ValidationPathSegment,
+    ): Output {
+      assertChildPathSegment(pathSegment, path);
+      const childPath = [...path, pathSegment];
+      if (depth >= state.maxDepth) {
+        throw new ConstructaError({
+          kind: "execution",
+          code: "MAX_EXECUTION_DEPTH",
+          path: childPath,
+          message: "Child execution exceeds the configured maximum depth.",
+        });
+      }
+      const parsed = parseDefinitionAtPath(child, childPath, state.snapshot);
+      return executeParsedDefinition(
+        parsed,
+        childPath,
+        depth + 1,
+        state,
+      ) as Output;
+    },
+  });
+  return invokeValidatedGeneratorImplementation(
+    implementation,
+    definition,
+    context,
+    path,
+  );
 }
 
 function createExecutionSnapshot(
@@ -529,10 +591,12 @@ function createExecutionSnapshot(
   );
 }
 
-function resolveExecutionRandom(
+function resolveExecutionOptions(
   options: ExecutionOptions | undefined,
-): RandomSource {
-  if (options === undefined) return createDefaultRandomSource();
+): Omit<ExecutionState, "snapshot"> {
+  if (options === undefined) {
+    return { random: createDefaultRandomSource(), maxDepth: 64 };
+  }
   if (typeof options !== "object" || options === null) {
     throw contextError(
       "INVALID_EXECUTION_OPTIONS",
@@ -547,15 +611,28 @@ function resolveExecutionRandom(
       "seed and random cannot be supplied together.",
     );
   }
-  if (options.seed !== undefined) return createSeededRandom(options.seed);
-  if (options.random !== undefined) return createRandomSource(options.random);
-  return createDefaultRandomSource();
+  const maxDepth = options.maxDepth ?? 64;
+  if (!Number.isSafeInteger(maxDepth) || maxDepth < 0) {
+    throw contextError(
+      "INVALID_EXECUTION_OPTIONS",
+      ["maxDepth"],
+      "maxDepth must be a non-negative safe integer.",
+    );
+  }
+  const random =
+    options.seed !== undefined
+      ? createSeededRandom(options.seed)
+      : options.random !== undefined
+        ? createRandomSource(options.random)
+        : createDefaultRandomSource();
+  return { random, maxDepth };
 }
 
 function analyzeGeneratorDependencies(
   implementation: GeneratorImplementation<GeneratorDefinition, unknown>,
   definition: GeneratorDefinition,
   registry: GeneratorRegistrySnapshot,
+  path: ValidationPath,
 ): void {
   if (implementation.analyzeDependencies === undefined) return;
   let dependencies: readonly GeneratorDependency[];
@@ -565,7 +642,7 @@ function analyzeGeneratorDependencies(
     throw normalizeConstructaError(cause, {
       kind: "dependency",
       code: "DEPENDENCY_ANALYSIS_FAILED",
-      path: [],
+      path,
       message: "Generator dependency analysis failed.",
     });
   }
@@ -573,7 +650,7 @@ function analyzeGeneratorDependencies(
     throw new ConstructaError({
       kind: "system",
       code: "DEPENDENCY_ANALYSIS_FAILED",
-      path: [],
+      path,
       message: "Generator dependency analysis returned an invalid result.",
     });
   }
@@ -582,12 +659,12 @@ function analyzeGeneratorDependencies(
       throw new ConstructaError({
         kind: "system",
         code: "DEPENDENCY_ANALYSIS_FAILED",
-        path: [],
+        path,
         message:
           "Generator dependency analysis returned an invalid dependency.",
       });
     }
-    registry.lookup(dependency.typeId, dependency.path);
+    registry.lookup(dependency.typeId, [...path, ...dependency.path]);
   }
 }
 
@@ -607,17 +684,39 @@ function invokeValidatedGeneratorImplementation(
   implementation: GeneratorImplementation<GeneratorDefinition, unknown>,
   definition: GeneratorDefinition,
   context: GenerationContext,
+  path: ValidationPath,
 ): unknown {
   try {
     return implementation.generate({ definition, context });
   } catch (cause) {
+    if (cause instanceof ConstructaError) {
+      return throwWithExecutionPath(cause, path);
+    }
     throw normalizeConstructaError(cause, {
       kind: "execution",
       code: "EXECUTION_FAILED",
-      path: [],
+      path,
       message: "Generator execution failed.",
     });
   }
+}
+
+function throwWithExecutionPath(
+  error: ConstructaError,
+  path: ValidationPath,
+): never {
+  if (path.length === 0 || startsWithPath(error.path, path)) throw error;
+  throw new ConstructaError({
+    kind: error.kind,
+    code: error.code,
+    path: [...path, ...error.path],
+    message: error.message,
+    details: error.details,
+  });
+}
+
+function startsWithPath(path: ValidationPath, prefix: ValidationPath): boolean {
+  return prefix.every((segment, index) => path[index] === segment);
 }
 
 /**
@@ -747,15 +846,16 @@ function parseRuntimeDefinition(
   return issues.length === 0
     ? {
         success: true,
-        value: markParsedDefinition(value as GeneratorDefinition),
+        value: markParsedDefinitions(visited, value as GeneratorDefinition),
       }
     : { success: false, issues: Object.freeze(issues) };
 }
 
-function markParsedDefinition(
+function markParsedDefinitions(
+  definitions: ReadonlySet<object>,
   definition: GeneratorDefinition,
 ): ParsedGeneratorDefinition {
-  parsedDefinitions.add(definition);
+  for (const parsed of definitions) parsedDefinitions.add(parsed);
   return definition as ParsedGeneratorDefinition;
 }
 
@@ -1213,6 +1313,22 @@ function assertContextPathSegment(
       "INVALID_GENERATION_CONTEXT",
       ["path"],
       "Context path segments must be strings or safe integers.",
+    );
+  }
+}
+
+function assertChildPathSegment(
+  segment: unknown,
+  path: ValidationPath,
+): asserts segment is ValidationPathSegment {
+  if (
+    typeof segment !== "string" &&
+    (typeof segment !== "number" || !Number.isSafeInteger(segment))
+  ) {
+    throw contextError(
+      "INVALID_CHILD_PATH",
+      path,
+      "Child path segments must be strings or safe integers.",
     );
   }
 }

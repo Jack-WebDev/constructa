@@ -1,3 +1,4 @@
+import { ConstructaError } from "constructa-schema";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import {
@@ -18,6 +19,7 @@ import {
   normalizeSeed,
   parseDefinition,
   parseDocument,
+  type RandomSource,
   type Seed,
   safeParseDefinition,
 } from "./index";
@@ -781,6 +783,167 @@ describe("single-value execution", () => {
         kind: "dependency",
         code: "UNKNOWN_GENERATOR",
         path: ["dependency", "type"],
+      }),
+    );
+  });
+});
+
+describe("child execution", () => {
+  it("delegates typed children with the same random source and child path", () => {
+    const registry = createRegistry();
+    let parentRandom: unknown;
+    let childRandom: unknown;
+    registry.register(
+      defineGenerator({
+        type: "child",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        generate({ context: generationContext }) {
+          childRandom = generationContext.random;
+          expect(generationContext.path).toEqual(["child"]);
+          return generationContext.random.integer(1_000);
+        },
+      }),
+    );
+    registry.register(
+      defineGenerator({
+        type: "parent",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        generate({ definition, context: generationContext }) {
+          parentRandom = generationContext.random;
+          return generationContext.executeChild(
+            (definition as unknown as { child: GeneratorDefinition<number> })
+              .child,
+            "child",
+          );
+        },
+      }),
+    );
+    const executor = createExecutor(registry);
+
+    expect(
+      executor.generate(
+        { type: "parent", child: { type: "child" } },
+        { seed: "shared" },
+      ),
+    ).toBe(createSeededRandom("shared").integer(1_000));
+    expect(parentRandom).toBe(childRandom);
+  });
+
+  it("uses one deterministic sequence across siblings and isolated sequences across roots", () => {
+    const registry = createRegistry();
+    const rootSources: RandomSource[] = [];
+    registry.register(
+      defineGenerator({
+        type: "draw",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        generate({ context: generationContext }) {
+          return generationContext.random.integer(1_000);
+        },
+      }),
+    );
+    registry.register(
+      defineGenerator({
+        type: "pair-draw",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        generate({ definition, context: generationContext }) {
+          rootSources.push(generationContext.random);
+          const children = definition as unknown as {
+            readonly left: GeneratorDefinition<number>;
+            readonly right: GeneratorDefinition<number>;
+          };
+          return [
+            generationContext.executeChild(children.left, "left"),
+            generationContext.executeChild(children.right, "right"),
+          ];
+        },
+      }),
+    );
+    const executor = createExecutor(registry);
+    const definition = {
+      type: "pair-draw",
+      left: { type: "draw" },
+      right: { type: "draw" },
+    };
+    const expected = createSeededRandom("sequence");
+
+    expect(executor.generate(definition, { seed: "sequence" })).toEqual([
+      expected.integer(1_000),
+      expected.integer(1_000),
+    ]);
+    const repeated = createSeededRandom("sequence");
+    expect(executor.generate(definition, { seed: "sequence" })).toEqual([
+      repeated.integer(1_000),
+      repeated.integer(1_000),
+    ]);
+    expect(rootSources[0]).not.toBe(rootSources[1]);
+  });
+
+  it("preserves child error paths and enforces maximum child depth", () => {
+    const registry = createRegistry();
+    registry.register(
+      defineGenerator({
+        type: "failing-child",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        generate() {
+          throw new ConstructaError({
+            kind: "dependency",
+            code: "REFERENCE_NOT_FOUND",
+            path: ["reference"],
+            message: "Reference was not found.",
+          });
+        },
+      }),
+    );
+    registry.register(
+      defineGenerator({
+        type: "parent-failure",
+        version: 1,
+        validateDefinition() {
+          return [];
+        },
+        generate({ definition, context: generationContext }) {
+          return generationContext.executeChild(
+            (definition as unknown as { child: GeneratorDefinition }).child,
+            "child",
+          );
+        },
+      }),
+    );
+    const executor = createExecutor(registry);
+    const definition = {
+      type: "parent-failure",
+      child: { type: "failing-child" },
+    };
+
+    expect(() => executor.generate(definition, { seed: 1 })).toThrow(
+      expect.objectContaining({
+        kind: "dependency",
+        code: "REFERENCE_NOT_FOUND",
+        path: ["child", "reference"],
+      }),
+    );
+    expect(() =>
+      executor.generate(definition, { seed: 1, maxDepth: 0 }),
+    ).toThrow(
+      expect.objectContaining({
+        kind: "execution",
+        code: "MAX_EXECUTION_DEPTH",
+        path: ["child"],
       }),
     );
   });
