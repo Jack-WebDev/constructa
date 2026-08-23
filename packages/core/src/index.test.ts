@@ -1,7 +1,9 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
+  createDefaultRandomSource,
   createGeneratorDefinition,
+  createRandomSource,
   createRegistry,
   defineGenerator,
   type GenerationContext,
@@ -25,7 +27,11 @@ function integer<const Minimum extends number>(min: Minimum) {
 }
 
 const context: GenerationContext = {
-  random: { next: () => 0.5 },
+  random: createRandomSource({
+    float: () => 0.5,
+    integer: () => 0,
+    bytes: (length) => new Uint8Array(length),
+  }),
   generateChild: (definition) => definition as never,
 };
 
@@ -47,7 +53,7 @@ const integerImplementation: GeneratorImplementation<
         ];
   },
   generate({ definition, context: generationContext }) {
-    return definition.min + generationContext.random.next();
+    return definition.min + generationContext.random.float();
   },
 });
 
@@ -179,6 +185,106 @@ describe("generator implementation contract", () => {
         code: "INVALID_CONFIGURATION",
         path: ["definition", "min"],
       }),
+    );
+  });
+});
+
+describe("random sources", () => {
+  it("provides a platform-backed source with documented output ranges", () => {
+    const source = createDefaultRandomSource();
+
+    expect(source.float()).toBeGreaterThanOrEqual(0);
+    expect(source.float()).toBeLessThan(1);
+    expect(source.integer(1)).toBe(0);
+    expect(source.integer(10)).toBeGreaterThanOrEqual(0);
+    expect(source.integer(10)).toBeLessThan(10);
+    expect(source.bytes(16)).toHaveLength(16);
+  });
+
+  it("uses scripted float, integer, and byte adapters at their documented boundaries", () => {
+    const requestedIntegers: number[] = [];
+    const requestedBytes: number[] = [];
+    const source = createRandomSource({
+      float: () => 0,
+      integer(maxExclusive) {
+        requestedIntegers.push(maxExclusive);
+        return maxExclusive - 1;
+      },
+      bytes(length) {
+        requestedBytes.push(length);
+        return Uint8Array.from({ length }, (_, index) => index);
+      },
+    });
+
+    expect(source.float()).toBe(0);
+    expect(source.integer(1)).toBe(0);
+    expect(source.integer(256)).toBe(255);
+    expect([...source.bytes(3)]).toEqual([0, 1, 2]);
+    expect(requestedIntegers).toEqual([1, 256]);
+    expect(requestedBytes).toEqual([3]);
+  });
+
+  it.each([
+    [
+      {
+        float: (): number => 1,
+        integer: (): number => 0,
+        bytes: (length: number): Uint8Array => new Uint8Array(length),
+      },
+      "float",
+    ],
+    [
+      {
+        float: (): number => 0.5,
+        integer: (): number => -1,
+        bytes: (length: number): Uint8Array => new Uint8Array(length),
+      },
+      "integer",
+    ],
+    [
+      {
+        float: (): number => 0.5,
+        integer: (): number => 0,
+        bytes: (): Uint8Array => new Uint8Array(0),
+      },
+      "bytes",
+    ],
+  ] as const)(
+    "fails invalid %s adapter output as a system error",
+    (adapter, method) => {
+      const source = createRandomSource(adapter);
+      const invoke =
+        method === "float"
+          ? () => source.float()
+          : method === "integer"
+            ? () => source.integer(2)
+            : () => source.bytes(2);
+
+      expect(invoke).toThrow(
+        expect.objectContaining({
+          kind: "system",
+          code: "INVALID_RANDOM_SOURCE",
+          path: ["random"],
+        }),
+      );
+    },
+  );
+
+  it("rejects malformed sources and invalid requested ranges", () => {
+    expect(() => createRandomSource({} as never)).toThrow(
+      expect.objectContaining({ code: "INVALID_RANDOM_SOURCE" }),
+    );
+
+    const source = createRandomSource({
+      float: () => 0.5,
+      integer: () => 0,
+      bytes: (length) => new Uint8Array(length),
+    });
+    expect(() => source.integer(0)).toThrow(
+      expect.objectContaining({ code: "INVALID_RANDOM_SOURCE" }),
+    );
+    expect(() => source.bytes(-1)).toThrow(
+      expect.objectContaining({ code: "INVALID_RANDOM_SOURCE" }),
     );
   });
 });

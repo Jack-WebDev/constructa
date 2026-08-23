@@ -134,4 +134,16 @@ describe("architecture boundary check", () => {
       ),
     ]);
   });
+
+  it("rejects ambient UUID randomness in core generator code", async () => {
+    const rootDirectory = await createFixture({
+      coreSource: "export const id = crypto.randomUUID();",
+    });
+
+    await expect(checkArchitecture(rootDirectory)).resolves.toEqual([
+      expect.stringContaining(
+        "constructa-core may not use ambient UUID randomness; use GenerationContext.random instead",
+      ),
+    ]);
+  });
 });

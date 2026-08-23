@@ -14,9 +14,99 @@ export type {
   ValidationPath,
 } from "constructa-schema";
 
+/**
+ * Random values are always half-open: `float()` returns [0, 1), while
+ * `integer(maxExclusive)` returns an integer in [0, maxExclusive).
+ */
 export type RandomSource = {
-  next(): number;
+  float(): number;
+  integer(maxExclusive: number): number;
+  bytes(length: number): Uint8Array;
 };
+
+export type RandomSourceAdapter = RandomSource;
+
+/**
+ * Validates an injected source and guards every produced value. No fallback
+ * randomness is used when an adapter violates its contract.
+ */
+export function createRandomSource(adapter: RandomSourceAdapter): RandomSource {
+  assertRandomSourceAdapter(adapter);
+
+  return Object.freeze({
+    float() {
+      const value = adapter.float();
+      if (
+        typeof value !== "number" ||
+        !Number.isFinite(value) ||
+        value < 0 ||
+        value >= 1
+      ) {
+        throw invalidRandomSource(
+          "float() must return a finite number in [0, 1).",
+        );
+      }
+      return value;
+    },
+    integer(maxExclusive: number) {
+      assertRandomLength(maxExclusive, "maxExclusive");
+      const value = adapter.integer(maxExclusive);
+      if (!Number.isSafeInteger(value) || value < 0 || value >= maxExclusive) {
+        throw invalidRandomSource(
+          "integer(maxExclusive) must return a safe integer in [0, maxExclusive).",
+        );
+      }
+      return value;
+    },
+    bytes(length: number) {
+      assertRandomLength(length, "length");
+      const value = adapter.bytes(length);
+      if (!(value instanceof Uint8Array) || value.length !== length) {
+        throw invalidRandomSource(
+          "bytes(length) must return a Uint8Array with exactly length bytes.",
+        );
+      }
+      return value;
+    },
+  });
+}
+
+/** Creates the default platform-backed random source. It makes no security claim. */
+export function createDefaultRandomSource(): RandomSource {
+  const crypto = globalThis.crypto;
+  if (crypto?.getRandomValues === undefined) {
+    throw new ConstructaError({
+      kind: "system",
+      code: "SYSTEM_RANDOM_UNAVAILABLE",
+      path: [],
+      message: "Platform cryptographic random values are unavailable.",
+    });
+  }
+
+  const randomBytes = (length: number) => {
+    const bytes = new Uint8Array(length);
+    for (let offset = 0; offset < length; offset += 65_536) {
+      crypto.getRandomValues(bytes.subarray(offset, offset + 65_536));
+    }
+    return bytes;
+  };
+  const uint32 = () => new DataView(randomBytes(4).buffer).getUint32(0);
+  const uint53 = () => (uint32() & 0x1f_ffff) * 2 ** 32 + uint32();
+
+  return createRandomSource({
+    float() {
+      return uint53() / 2 ** 53;
+    },
+    integer(maxExclusive: number) {
+      const range = 2 ** 53;
+      const upperLimit = range - (range % maxExclusive);
+      let value = uint53();
+      while (value >= upperLimit) value = uint53();
+      return value % maxExclusive;
+    },
+    bytes: randomBytes,
+  });
+}
 
 /** Services supplied by the engine. Implementations must not use global randomness. */
 export type GenerationContext = {
@@ -331,6 +421,35 @@ function registryError(
   message: string,
 ): ConstructaError {
   return new ConstructaError({ kind: "configuration", code, path, message });
+}
+
+function assertRandomSourceAdapter(adapter: RandomSourceAdapter): void {
+  if (
+    typeof adapter !== "object" ||
+    adapter === null ||
+    typeof adapter.float !== "function" ||
+    typeof adapter.integer !== "function" ||
+    typeof adapter.bytes !== "function"
+  ) {
+    throw invalidRandomSource(
+      "A random source must provide float(), integer(), and bytes() methods.",
+    );
+  }
+}
+
+function assertRandomLength(value: number, name: string): void {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw invalidRandomSource(`${name} must be a positive safe integer.`);
+  }
+}
+
+function invalidRandomSource(message: string): ConstructaError {
+  return new ConstructaError({
+    kind: "system",
+    code: "INVALID_RANDOM_SOURCE",
+    path: ["random"],
+    message,
+  });
 }
 
 function isStableTypeId(value: string): boolean {

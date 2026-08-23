@@ -303,6 +303,14 @@ async function checkSourceImports(workspacePackages, rootDirectory) {
           `${relative(rootDirectory, filePath)}: ${sourcePackage.name} may not use Math.random(); use GenerationContext.random instead`,
         );
       }
+      if (
+        globalRandomnessRestrictedPackages.has(sourcePackage.name) &&
+        /\b(?:crypto\.|globalThis\.crypto\.)randomUUID\s*\(/u.test(sourceText)
+      ) {
+        errors.push(
+          `${relative(rootDirectory, filePath)}: ${sourcePackage.name} may not use ambient UUID randomness; use GenerationContext.random instead`,
+        );
+      }
 
       for (const { line, specifier } of imports) {
         if (

@@ -21,6 +21,10 @@ Use `defineGenerator()` for developer-authored executable implementations. An im
 
 `GeneratorDefinition<Output>` carries output information only at compile time; emitted definitions remain plain JSON data. Factories should use `createGeneratorDefinition()` so literal fields are preserved and the resulting definition is portable. Implementations receive randomness and child generation through `GenerationContext`; they must not use global randomness or built-in-specific execution switches.
 
+## Random sources
+
+`RandomSource` exposes `float()` in `[0, 1)`, `integer(maxExclusive)` in `[0, maxExclusive)`, and `bytes(length)` with exactly the requested number of bytes. Use `createRandomSource()` to validate injected adapters or `createDefaultRandomSource()` for the platform-backed source. Invalid source output is a system error; Constructa never substitutes biased fallback randomness. The default source uses platform cryptographic bytes, but this package makes no claim that generated values are suitable for a security-sensitive use case.
+
 ## Registry
 
 `createRegistry()` is advanced infrastructure. Register trusted implementations explicitly with `register()`. Duplicate type IDs fail without changing registry state; `replace()` is the deliberate replacement path and requires the type to already be registered. `lookup(type, path?)` resolves a registered implementation without a central built-in switch. Unknown IDs throw a dependency `UNKNOWN_GENERATOR` error at the supplied definition path plus `type`, with safe registered-type diagnostics. `snapshot()` returns an immutable, type-sorted registry view with the same lookup behavior; later registry changes do not affect it. Dispatch remains a separate concern.
