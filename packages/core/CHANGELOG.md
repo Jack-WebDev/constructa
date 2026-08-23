@@ -1,5 +1,12 @@
 # constructa-core
 
+## 0.0.5
+
+### Patch Changes
+
+- Updated dependencies [f2ef358]
+  - constructa-schema@1.0.0
+
 ## 0.0.4
 
 ### Patch Changes

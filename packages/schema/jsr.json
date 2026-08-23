@@ -1,6 +1,6 @@
 {
   "name": "@constructa/schema",
-  "version": "0.0.4",
+  "version": "1.0.0",
   "exports": {
     ".": "./src/index.ts"
   },

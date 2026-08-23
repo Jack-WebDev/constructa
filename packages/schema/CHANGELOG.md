@@ -1,5 +1,11 @@
 # constructa-schema
 
+## 1.0.0
+
+### Major Changes
+
+- f2ef358: Replace the `{ type, configuration }` envelope with versioned generator documents containing flat generator definitions. Use `parseDocument` and the new document validation APIs; the retired envelope APIs are no longer exported.
+
 ## 0.0.4
 
 ### Patch Changes
