@@ -1,5 +1,13 @@
 # constructa-generators
 
+## 0.4.3
+
+### Patch Changes
+
+- Updated dependencies [b7cddb6]
+  - constructa-schema@2.4.0
+  - constructa-core@0.8.2
+
 ## 0.4.2
 
 ### Patch Changes
