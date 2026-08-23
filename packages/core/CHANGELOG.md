@@ -1,5 +1,11 @@
 # constructa-core
 
+## 0.7.0
+
+### Minor Changes
+
+- d0b3e3c: Add portable template token and reference path parsing.
+
 ## 0.6.0
 
 ### Minor Changes
