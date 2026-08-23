@@ -19,9 +19,12 @@ import {
   normalizeSeed,
   parseDefinition,
   parseDocument,
+  parseReferencePath,
+  parseTemplateTokens,
   type RandomSource,
   type Seed,
   safeParseDefinition,
+  type TemplateToken,
 } from "./index";
 
 type IntegerDefinition<Minimum extends number = number> =
@@ -195,6 +198,52 @@ describe("generator implementation contract", () => {
         kind: "configuration",
         code: "INVALID_CONFIGURATION",
         path: ["definition", "min"],
+      }),
+    );
+  });
+});
+
+describe("template token parsing", () => {
+  it("parses sibling and nested paths without resolving values", () => {
+    const tokens = parseTemplateTokens(
+      "Hello {firstName} from {address.city}.",
+    );
+
+    expectTypeOf(tokens).toEqualTypeOf<readonly TemplateToken[]>();
+    expect(tokens).toEqual([
+      { type: "literal", value: "Hello " },
+      { type: "reference", path: ["firstName"] },
+      { type: "literal", value: " from " },
+      { type: "reference", path: ["address", "city"] },
+      { type: "literal", value: "." },
+    ]);
+    expect(Object.isFrozen(tokens)).toBe(true);
+    expect(parseReferencePath("__proto__.001")).toEqual(["__proto__", "001"]);
+  });
+
+  it("supports escaped literal braces and repeated tokens", () => {
+    expect(parseTemplateTokens("{{{name}}}: {name}")).toEqual([
+      { type: "literal", value: "{" },
+      { type: "reference", path: ["name"] },
+      { type: "literal", value: "}: " },
+      { type: "reference", path: ["name"] },
+    ]);
+  });
+
+  it.each([
+    ["{", "missing a closing brace"],
+    ["}", "unmatched closing brace"],
+    ["{}", "must not be empty"],
+    ["{first..last}", "must be non-empty"],
+    ["{first name}", "cannot contain whitespace"],
+    ["{first{last}}", "cannot contain whitespace or braces"],
+  ])("rejects malformed syntax: %s", (source, message) => {
+    expect(() => parseTemplateTokens(source, { path: ["source"] })).toThrow(
+      expect.objectContaining({
+        kind: "configuration",
+        code: "INVALID_TEMPLATE_TOKEN",
+        path: ["source"],
+        message: expect.stringContaining(message),
       }),
     );
   });
