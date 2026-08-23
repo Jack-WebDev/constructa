@@ -12,6 +12,95 @@ export type ValidationIssue = {
   readonly details?: JsonObject;
 };
 
+export const CONSTRUCTA_ERROR_KINDS = [
+  "configuration",
+  "dependency",
+  "execution",
+  "system",
+] as const;
+export type ConstructaErrorKind = (typeof CONSTRUCTA_ERROR_KINDS)[number];
+
+export const RESERVED_CONSTRUCTA_ERROR_CODES = [
+  "INVALID_RANGE",
+  "EMPTY_CHOICE",
+  "INVALID_LENGTH",
+  "UNKNOWN_GENERATOR",
+  "REFERENCE_NOT_FOUND",
+  "CIRCULAR_REFERENCE",
+  "EXECUTION_FAILED",
+  "UNSUPPORTED_SCHEMA_VERSION",
+  "INVALID_CONFIGURATION",
+  "INVALID_JSON_VALUE",
+] as const;
+export type ConstructaErrorCode = Uppercase<string>;
+
+export type ConstructaErrorOptions = {
+  readonly kind: ConstructaErrorKind;
+  readonly code: ConstructaErrorCode;
+  readonly path: ValidationPath;
+  readonly message: string;
+  readonly details?: JsonObject;
+};
+
+export type SafeConstructaError = ConstructaErrorOptions;
+
+/** A safe, serializable error shared by every Constructa surface. */
+export class ConstructaError extends TypeError {
+  readonly kind: ConstructaErrorKind;
+  readonly code: ConstructaErrorCode;
+  readonly path: ValidationPath;
+  readonly details?: JsonObject;
+  readonly #cause: unknown;
+
+  constructor(options: ConstructaErrorOptions, cause?: unknown) {
+    validateConstructaErrorOptions(options);
+    super(options.message);
+    this.name = "ConstructaError";
+    this.kind = options.kind;
+    this.code = options.code;
+    this.path = options.path;
+    this.details = options.details;
+    this.#cause = cause;
+  }
+
+  /** Returns only data that is safe to send across a process or network boundary. */
+  toJSON(): SafeConstructaError {
+    return this.details === undefined
+      ? {
+          kind: this.kind,
+          code: this.code,
+          path: this.path,
+          message: this.message,
+        }
+      : {
+          kind: this.kind,
+          code: this.code,
+          path: this.path,
+          message: this.message,
+          details: this.details,
+        };
+  }
+
+  hasCause(): boolean {
+    return this.#cause !== undefined;
+  }
+}
+
+export function createConstructaError(
+  options: ConstructaErrorOptions,
+): ConstructaError {
+  return new ConstructaError(options);
+}
+
+export function normalizeConstructaError(
+  cause: unknown,
+  options: ConstructaErrorOptions,
+): ConstructaError {
+  return cause instanceof ConstructaError
+    ? cause
+    : new ConstructaError(options, cause);
+}
+
 export const CURRENT_SCHEMA_VERSION = 1;
 export const SUPPORTED_SCHEMA_VERSIONS = [CURRENT_SCHEMA_VERSION] as const;
 export type SchemaVersion = (typeof SUPPORTED_SCHEMA_VERSIONS)[number];
@@ -145,46 +234,76 @@ export type GeneratorDocumentParseResult =
   | { readonly success: true; readonly value: GeneratorDocumentV1 }
   | { readonly success: false; readonly failure: GeneratorDocumentFailure };
 
-export class JsonValueError extends TypeError {
+export class JsonValueError extends ConstructaError {
   readonly issue: ValidationIssue;
   constructor(path: ValidationPath, reason: string) {
-    super(`${formatValidationPath(path)}: ${reason}`);
+    super({
+      kind: "configuration",
+      code: "INVALID_JSON_VALUE",
+      path,
+      message: reason,
+      details: { issueCode: "invalid_json_value" },
+    });
     this.name = "JsonValueError";
     this.issue = { code: "invalid_json_value", path, message: reason };
   }
 }
 
-export class SchemaVersionError extends TypeError {
+export class SchemaVersionError extends ConstructaError {
   readonly failure: SchemaVersionFailure;
   constructor(failure: SchemaVersionFailure) {
-    super(`${formatValidationPath(failure.path)}: ${failure.message}`);
+    super({
+      kind: "configuration",
+      code: "UNSUPPORTED_SCHEMA_VERSION",
+      path: failure.path,
+      message: failure.message,
+      details: { issueCode: failure.code },
+    });
     this.name = "SchemaVersionError";
     this.failure = failure;
   }
 }
 
-export class GeneratorDefinitionError extends TypeError {
+export class GeneratorDefinitionError extends ConstructaError {
   readonly failure: GeneratorDefinitionFailure;
   constructor(failure: GeneratorDefinitionFailure) {
-    super(`${formatValidationPath(failure.path)}: ${failure.message}`);
+    super({
+      kind: "configuration",
+      code: "INVALID_CONFIGURATION",
+      path: failure.path,
+      message: failure.message,
+      details: { issueCode: failure.code },
+    });
     this.name = "GeneratorDefinitionError";
     this.failure = failure;
   }
 }
 
-export class GeneratorMetadataError extends TypeError {
+export class GeneratorMetadataError extends ConstructaError {
   readonly failure: GeneratorMetadataFailure;
   constructor(failure: GeneratorMetadataFailure) {
-    super(`${formatValidationPath(failure.path)}: ${failure.message}`);
+    super({
+      kind: "configuration",
+      code: "INVALID_CONFIGURATION",
+      path: failure.path,
+      message: failure.message,
+      details: { issueCode: failure.code },
+    });
     this.name = "GeneratorMetadataError";
     this.failure = failure;
   }
 }
 
-export class GeneratorDocumentError extends TypeError {
+export class GeneratorDocumentError extends ConstructaError {
   readonly failure: GeneratorDocumentFailure;
   constructor(failure: GeneratorDocumentFailure) {
-    super(`${formatValidationPath(failure.path)}: ${failure.message}`);
+    super({
+      kind: "configuration",
+      code: "INVALID_CONFIGURATION",
+      path: failure.path,
+      message: failure.message,
+      details: { issueCode: failure.code },
+    });
     this.name = "GeneratorDocumentError";
     this.failure = failure;
   }
@@ -554,15 +673,30 @@ function appendPathSegment(
   return [...path, segment];
 }
 
-function formatValidationPath(path: ValidationPath) {
-  return path.length === 0
-    ? "$"
-    : path
-        .map((segment) =>
-          typeof segment === "number" ? `[${segment}]` : `.${segment}`,
-        )
-        .join("")
-        .replace(/^\./u, "$");
+function validateConstructaErrorOptions(options: ConstructaErrorOptions): void {
+  if (!CONSTRUCTA_ERROR_KINDS.includes(options.kind)) {
+    throw new TypeError("kind must be a Constructa error kind");
+  }
+  if (!/^[A-Z][A-Z0-9_]*$/u.test(options.code)) {
+    throw new TypeError("code must be an uppercase stable error code");
+  }
+  if (typeof options.message !== "string" || options.message.length === 0) {
+    throw new TypeError("message must be a non-empty string");
+  }
+  for (const segment of options.path) {
+    if (
+      typeof segment !== "string" &&
+      (typeof segment !== "number" || !Number.isSafeInteger(segment))
+    ) {
+      throw new TypeError("path segments must be strings or safe integers");
+    }
+  }
+  if (
+    options.details !== undefined &&
+    (!isJsonRecord(options.details) || !isJsonValue(options.details))
+  ) {
+    throw new TypeError("details must be a portable JSON object");
+  }
 }
 
 function isMetadataId(value: string) {

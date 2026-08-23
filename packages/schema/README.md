@@ -35,6 +35,12 @@ Validation APIs expose stable issues with a `code`, human-readable `message`, se
 
 Use `validateDocument` to receive every independent document issue in deterministic order, or `validateGeneratorDefinition` for a definition and its nested typed definitions. `parseDocument` and `safeParseDocument` use the first issue when a single parse result is required. Path rendering is intentionally left to the consuming interface.
 
+## Structured errors
+
+`ConstructaError` is the shared safe error model. Every error has a `kind` (`configuration`, `dependency`, `execution`, or `system`), an uppercase stable `code`, segment `path`, human-readable `message`, and optional JSON-safe `details`. Reserved codes include `INVALID_RANGE`, `EMPTY_CHOICE`, `INVALID_LENGTH`, `UNKNOWN_GENERATOR`, `REFERENCE_NOT_FOUND`, `CIRCULAR_REFERENCE`, `EXECUTION_FAILED`, and `UNSUPPORTED_SCHEMA_VERSION`.
+
+Use `createConstructaError` for a known failure or `normalizeConstructaError` to wrap an unknown cause. Calling `toJSON()` returns only the safe error data; original causes are never serialized. Schema validation exceptions are categorized as configuration errors.
+
 ## Semantic generator metadata
 
 `GeneratorMetadata` describes a generator without influencing execution. All fields are optional so third-party generators can provide only what they know: `typeId`, `displayName`, `description`, `category`, `outputCategory`, `documentationUrl`, and JSON-only `examples`.

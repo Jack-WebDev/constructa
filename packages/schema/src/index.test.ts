@@ -4,7 +4,9 @@ import {
   assertDocument,
   assertGeneratorMetadata,
   assertJsonValue,
+  ConstructaError,
   CURRENT_SCHEMA_VERSION,
+  createConstructaError,
   GENERATOR_DOCUMENT_TOP_LEVEL_KEYS,
   type GeneratorDefinition,
   GeneratorDocumentError,
@@ -15,6 +17,7 @@ import {
   isGeneratorMetadata,
   isJsonValue,
   JsonValueError,
+  normalizeConstructaError,
   parseDocument,
   safeParseDocument,
   type ValidationPath,
@@ -55,6 +58,97 @@ function sparseArray() {
 const cyclicValue: Record<string, unknown> = {};
 cyclicValue.self = cyclicValue;
 const compileTimePath: ValidationPath = ["definition", "fields", 0];
+
+describe("structured errors", () => {
+  it.each(["configuration", "dependency", "execution", "system"] as const)(
+    "serializes %s errors without functions",
+    (kind) => {
+      const error = createConstructaError({
+        kind,
+        code: "EXECUTION_FAILED",
+        path: ["definition", "fields", 0],
+        message: "Generation failed.",
+        details: { attempt: 1 },
+      });
+
+      expect(error).toBeInstanceOf(ConstructaError);
+      expect(JSON.parse(JSON.stringify(error))).toEqual({
+        kind,
+        code: "EXECUTION_FAILED",
+        path: ["definition", "fields", 0],
+        message: "Generation failed.",
+        details: { attempt: 1 },
+      });
+    },
+  );
+
+  it("preserves an existing structured error when wrapping it", () => {
+    const inner = createConstructaError({
+      kind: "dependency",
+      code: "REFERENCE_NOT_FOUND",
+      path: ["definition", "reference"],
+      message: "Referenced generator was not found.",
+    });
+    const wrapped = normalizeConstructaError(inner, {
+      kind: "execution",
+      code: "EXECUTION_FAILED",
+      path: [],
+      message: "Generation failed.",
+    });
+
+    expect(wrapped.toJSON()).toEqual(inner.toJSON());
+  });
+
+  it("redacts system causes from safe output", () => {
+    const error = normalizeConstructaError(new Error("secret database URL"), {
+      kind: "system",
+      code: "EXECUTION_FAILED",
+      path: [],
+      message: "The generator could not be executed.",
+    });
+
+    expect(error.hasCause()).toBe(true);
+    expect(JSON.stringify(error)).not.toContain("secret database URL");
+    expect(error.toJSON()).toEqual({
+      kind: "system",
+      code: "EXECUTION_FAILED",
+      path: [],
+      message: "The generator could not be executed.",
+    });
+  });
+
+  it("rejects unsafe details and non-uppercase codes", () => {
+    expect(() =>
+      createConstructaError({
+        kind: "configuration",
+        code: "invalid_configuration" as Uppercase<string>,
+        path: [],
+        message: "Invalid configuration.",
+      }),
+    ).toThrow(TypeError);
+    expect(() =>
+      createConstructaError({
+        kind: "configuration",
+        code: "INVALID_CONFIGURATION",
+        path: [],
+        message: "Invalid configuration.",
+        details: { cause: () => "unsafe" } as unknown as { cause: string },
+      }),
+    ).toThrow(TypeError);
+  });
+
+  it("maps schema validation exceptions into configuration errors", () => {
+    expect.assertions(4);
+    try {
+      assertDocument({ schemaVersion: 1, definition: { type: "" } });
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConstructaError);
+      expect((error as ConstructaError).kind).toBe("configuration");
+      expect((error as ConstructaError).code).toBe("INVALID_CONFIGURATION");
+      expect((error as ConstructaError).path).toEqual(["definition", "type"]);
+    }
+  });
+});
 
 describe("portable JSON values", () => {
   it("round-trips JSON-compatible values", () => {
