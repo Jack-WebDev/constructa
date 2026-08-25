@@ -39,8 +39,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.5.6",
-    "@changesets/cli": "^2.31.1",
+    "@biomejs/biome": "^2.5.10",
+    "@changesets/cli": "^3.0.1",
     "@constructa/config": "workspace:*",
     "@types/node": "catalog:",
     "@vitest/coverage-v8": "catalog:",
@@ -48,9 +48,9 @@
     "jsdom": "catalog:",
     "jsr": "^0.14.3",
     "lint-staged": "^17.2.0",
-    "publint": "^0.3.23",
+    "publint": "^0.3.24",
     "tsdown": "catalog:",
-    "turbo": "^2.10.7",
+    "turbo": "^2.10.11",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
