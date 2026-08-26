@@ -30,8 +30,8 @@
     "access": "public"
   },
   "dependencies": {
-    "constructa-core": "workspace:*",
-    "constructa-schema": "workspace:*"
+    "constructa-core": "workspace:^",
+    "constructa-schema": "workspace:^"
   },
   "devDependencies": {
     "@constructa/config": "workspace:*",

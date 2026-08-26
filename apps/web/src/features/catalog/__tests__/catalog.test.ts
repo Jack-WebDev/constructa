@@ -5,7 +5,7 @@ import {
   getCatalogEntry,
   normalizeSearchQuery,
   searchGeneratorCatalog,
-} from "./catalog";
+} from "../catalog";
 
 describe("generator catalog search", () => {
   it("normalizes name, description, and tag searches with deterministic ranking", () => {

@@ -6,7 +6,7 @@ import {
   getBuiltInEditorRegistry,
   getGeneratorEditor,
   WEB_EDITOR_REGISTRY,
-} from "./registry";
+} from "../registry";
 
 describe("web editor registry", () => {
   it("maps every semantic built-in type to one web editor", () => {

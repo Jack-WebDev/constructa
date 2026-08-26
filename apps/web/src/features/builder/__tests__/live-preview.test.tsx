@@ -10,8 +10,8 @@ import {
   LIVE_PREVIEW_DEBOUNCE_MS,
   LivePreview,
   type PreviewGenerator,
-} from "./live-preview";
-import { type BuilderDocumentDraft, createBuilderDraft } from "./state";
+} from "../live-preview";
+import { type BuilderDocumentDraft, createBuilderDraft } from "../state";
 
 afterEach(() => {
   cleanup();

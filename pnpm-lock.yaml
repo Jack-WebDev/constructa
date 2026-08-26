@@ -224,7 +224,7 @@ importers:
   packages/core:
     dependencies:
       constructa-schema:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../schema
     devDependencies:
       '@constructa/config':
@@ -268,10 +268,10 @@ importers:
   packages/generators:
     dependencies:
       constructa-core:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       constructa-schema:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../schema
     devDependencies:
       '@constructa/config':
@@ -293,16 +293,16 @@ importers:
   packages/sdk:
     dependencies:
       constructa-core:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
       constructa-exporters:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../exporters
       constructa-generators:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../generators
       constructa-schema:
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../schema
     devDependencies:
       '@constructa/config':
