@@ -10,7 +10,7 @@ import {
   integer,
   string,
 } from "constructa-sdk";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DefinitionProperties } from "../editor/controls";
 import {
@@ -38,7 +38,28 @@ export function QuickGenerateShell() {
     status: "idle",
   });
   const [issues, setIssues] = useState<readonly EditorValidationIssue[]>([]);
+  const configurationRef = useRef<HTMLFormElement>(null);
+  const resultRef = useRef<HTMLElement>(null);
   const editor = getGeneratorEditor(typeId);
+
+  useEffect(() => {
+    if (!shouldScrollToResult(generation) || !isCompactViewport()) {
+      return;
+    }
+    resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [generation]);
+
+  useEffect(() => {
+    if (
+      generation.status !== "error" ||
+      generation.error.kind !== "configuration"
+    ) {
+      return;
+    }
+    configurationRef.current
+      ?.querySelector<HTMLElement>('[aria-invalid="true"]')
+      ?.focus();
+  }, [generation]);
 
   function selectGenerator(nextTypeId: string) {
     setTypeId(nextTypeId);
@@ -71,67 +92,104 @@ export function QuickGenerateShell() {
   const Editor = editor?.Editor;
 
   return (
-    <main className="container mx-auto grid max-w-5xl gap-8 px-6 py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <section aria-labelledby="quick-generate-title" className="space-y-6">
+    <main className="container mx-auto grid max-w-5xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8 lg:py-12">
+      <section
+        aria-labelledby="quick-generate-title"
+        className="rounded-xl border bg-card p-4 shadow-sm sm:p-6"
+      >
         <div className="space-y-2">
           <p className="font-medium text-muted-foreground uppercase tracking-wider">
             Quick Generate
           </p>
           <h1
-            className="font-semibold text-4xl tracking-tight"
+            className="font-semibold text-3xl tracking-tight sm:text-4xl"
             id="quick-generate-title"
           >
             Generate one value.
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground" id="quick-generate-description">
             Choose a generator, adjust its definition, and run it through the
             shared engine.
           </p>
         </div>
 
-        <div className="grid gap-1.5">
-          <Label htmlFor="generator-type">Generator</Label>
-          <select
-            id="generator-type"
-            onChange={(event) => selectGenerator(event.target.value)}
-            value={typeId}
-          >
-            {BUILT_IN_GENERATOR_CATALOG.map((entry) => (
-              <option key={entry.typeId} value={entry.typeId}>
-                {entry.displayName}
-              </option>
-            ))}
-          </select>
-        </div>
+        <form
+          aria-describedby="quick-generate-description"
+          aria-labelledby="quick-generate-title"
+          className="mt-6 space-y-6"
+          onSubmit={(event) => {
+            event.preventDefault();
+            generateValue();
+          }}
+          ref={configurationRef}
+        >
+          <div className="grid gap-1.5">
+            <Label htmlFor="generator-type">Generator</Label>
+            <select
+              className="h-11 w-full rounded border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/80 dark:bg-input/30"
+              id="generator-type"
+              onChange={(event) => selectGenerator(event.target.value)}
+              value={typeId}
+            >
+              {BUILT_IN_GENERATOR_CATALOG.map((entry) => (
+                <option key={entry.typeId} value={entry.typeId}>
+                  {entry.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        <section aria-labelledby="configuration-title" className="space-y-3">
-          <h2 className="font-medium text-lg" id="configuration-title">
-            Configuration
-          </h2>
-          {Editor === undefined ? (
-            <p role="alert">The selected generator is not available.</p>
-          ) : (
-            <Editor
-              definition={definition}
-              issues={issues}
-              onChange={updateDefinition}
-            />
-          )}
-          <DefinitionErrorSummary issues={issues} />
-          {hasEditableProperties(definition) ? null : (
-            <p className="text-muted-foreground text-sm">
-              This generator has no editable configuration.
-            </p>
-          )}
-        </section>
-
-        <Button onClick={generateValue} type="button">
-          Generate
-        </Button>
+          <section aria-labelledby="configuration-title" className="space-y-3">
+            <h2 className="font-medium text-lg" id="configuration-title">
+              Configuration
+            </h2>
+            {Editor === undefined ? (
+              <p role="alert">The selected generator is not available.</p>
+            ) : (
+              <Editor
+                definition={definition}
+                issues={issues}
+                onChange={updateDefinition}
+              />
+            )}
+            <DefinitionErrorSummary issues={issues} />
+            {hasEditableProperties(definition) ? null : (
+              <p className="text-muted-foreground text-sm">
+                This generator has no editable configuration.
+              </p>
+            )}
+          </section>
+          <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t bg-card/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:backdrop-blur-none">
+            <Button className="h-11 w-full text-sm lg:w-auto" type="submit">
+              Generate
+            </Button>
+          </div>
+        </form>
       </section>
 
-      <ResultPreview state={generation} />
+      <aside
+        aria-label="Generation result"
+        className="lg:sticky lg:top-6 lg:self-start"
+        ref={resultRef}
+      >
+        <ResultPreview state={generation} />
+      </aside>
     </main>
+  );
+}
+
+function isCompactViewport(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(max-width: 1023px)").matches
+  );
+}
+
+function shouldScrollToResult(generation: ResultPreviewState): boolean {
+  return (
+    generation.status === "success" ||
+    (generation.status === "error" && generation.error.kind !== "configuration")
   );
 }
 

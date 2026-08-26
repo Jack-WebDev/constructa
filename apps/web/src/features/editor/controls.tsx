@@ -34,6 +34,7 @@ export function NumberControl({
         disabled={disabled}
         id={id}
         inputMode="decimal"
+        className="h-11 text-sm focus-visible:ring-2"
         name={name}
         onChange={(event) => onChange(parseNumberDraft(event.target.value))}
         type="number"
@@ -66,6 +67,7 @@ export function TextControl({
         aria-invalid={error === undefined ? undefined : true}
         disabled={disabled}
         id={id}
+        className="h-11 text-sm focus-visible:ring-2"
         name={name}
         onChange={(event) => onChange(event.target.value)}
         type="text"
@@ -138,6 +140,7 @@ export function SelectControl({
         aria-invalid={error === undefined ? undefined : true}
         disabled={disabled}
         id={id}
+        className="h-11 w-full rounded border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/80 dark:bg-input/30"
         name={name}
         onChange={(event) => onChange(event.target.value)}
         value={formatDraft(value)}
@@ -177,6 +180,7 @@ export function ListControl({
         aria-invalid={error === undefined ? undefined : true}
         disabled={disabled}
         id={id}
+        className="min-h-28 text-sm focus-visible:ring-2"
         name={name}
         onChange={(event) => onChange(parseJsonListDraft(event.target.value))}
         value={formatJsonListDraft(value)}
@@ -211,6 +215,7 @@ export function DateControl({
         aria-invalid={error === undefined ? undefined : true}
         disabled={disabled}
         id={id}
+        className="h-11 text-sm focus-visible:ring-2"
         name={name}
         onChange={(event) => onChange(event.target.value)}
         type="date"

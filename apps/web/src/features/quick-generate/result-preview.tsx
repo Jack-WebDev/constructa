@@ -28,7 +28,10 @@ export function ResultPreview({
   readonly state: ResultPreviewState;
 }) {
   return (
-    <section aria-labelledby="result-title" className="rounded-lg border p-5">
+    <section
+      aria-labelledby="result-title"
+      className="scroll-mt-4 rounded-xl border bg-card p-4 shadow-sm sm:p-6"
+    >
       <h2 className="font-medium text-lg" id="result-title">
         Result
       </h2>
@@ -107,13 +110,18 @@ function SuccessPreview({
   return (
     <>
       <output
+        aria-label="Generated result"
         aria-live="polite"
-        className="mt-3 block max-h-96 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-3 font-mono text-sm"
+        className="mt-3 block max-h-[50dvh] overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded bg-muted p-3 font-mono text-sm sm:max-h-96"
       >
         {visiblePreview}
       </output>
-      <div className="mt-3 flex items-center gap-3">
+      <p aria-live="polite" className="sr-only">
+        Generated result ready.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button
+          className="h-11 text-sm focus-visible:ring-2"
           disabled={copyStatus === "copying"}
           onClick={copyPreview}
           type="button"

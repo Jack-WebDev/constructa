@@ -14,6 +14,7 @@ import {
   type Infer,
   integer,
   object,
+  safeParseDocument,
   serializeDefinition,
   string,
   template,
@@ -59,6 +60,35 @@ describe("canonical SDK API", () => {
     expect(generate(reparsed, { seed: "portable" })).toEqual(
       generate(definition, { seed: "portable" }),
     );
+  });
+
+  it("validates versioned documents through the built-in registry without execution", () => {
+    const result = safeParseDocument({
+      schemaVersion: 1,
+      definition: { type: "integer", min: 1, max: 1 },
+    });
+    expect(result).toEqual({
+      success: true,
+      value: {
+        schemaVersion: 1,
+        definition: { type: "integer", min: 1, max: 1 },
+      },
+    });
+
+    const invalid = safeParseDocument({
+      schemaVersion: 1,
+      definition: { type: "missing" },
+    });
+    expect(invalid).toEqual({
+      success: false,
+      issues: [
+        expect.objectContaining({
+          kind: "dependency",
+          code: "UNKNOWN_GENERATOR",
+          path: ["definition", "type"],
+        }),
+      ],
+    });
   });
 });
 

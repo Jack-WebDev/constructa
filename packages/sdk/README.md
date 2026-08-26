@@ -32,10 +32,12 @@ const role = generate(choice(["admin", "member"]), { seed: "example" });
 
 `Infer<typeof definition>` captures a factory definition's generated value
 type. It preserves `choice()` literals and recursively maps `object()` and
-`array()` definitions. `parseDefinition`, `parseDocument`,
-`serializeDefinition`, and `serializeDocument` are available as developer
-utilities; `createRegistry`, `createExecutor`, `createEngine`, and
-`defineGenerator` remain advanced APIs.
+`array()` definitions. `safeParseDocument(value)` validates an untrusted,
+versioned document against the SDK's built-in registry without executing it;
+its failure result contains the shared structured errors and paths.
+`parseDefinition`, `parseDocument`, `serializeDefinition`, and
+`serializeDocument` are available as developer utilities; `createRegistry`,
+`createExecutor`, `createEngine`, and `defineGenerator` remain advanced APIs.
 
 `createEngine({ registry?, random?, limits? })` is available for advanced
 customization. A supplied registry replaces the built-in registry and is

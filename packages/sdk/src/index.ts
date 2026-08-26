@@ -8,6 +8,7 @@ import {
   createExecutor,
   createRandomSource,
   createRegistry,
+  type DocumentParseResult,
   type ExecutionOptions,
   type GeneratorDefinition,
   type GeneratorRegistry,
@@ -15,6 +16,7 @@ import {
   type ParseLimits,
   parseDefinition,
   type RandomSource,
+  safeParseDocument as safeParseCoreDocument,
 } from "constructa-core";
 import {
   registerArrayGenerator,
@@ -63,7 +65,14 @@ const ENGINE_ERROR_CODES = {
 type EngineErrorCode =
   (typeof ENGINE_ERROR_CODES)[keyof typeof ENGINE_ERROR_CODES];
 
-const defaultEngine = createEngine();
+const defaultRegistry = createBuiltInRegistry().snapshot();
+const defaultEngine = createEngine({ registry: defaultRegistry });
+
+/** Options for parsing a document with the SDK's built-in registry. */
+export type SafeParseDocumentOptions = {
+  /** Limits applied while validating a document and its definitions. */
+  readonly limits?: ParseLimits;
+};
 
 /** Generates one value through the isolated SDK built-in engine. */
 export function generate<Definition extends GeneratorDefinition>(
@@ -71,6 +80,20 @@ export function generate<Definition extends GeneratorDefinition>(
   options?: ExecutionOptions,
 ): import("constructa-schema").Infer<Definition> {
   return defaultEngine.generate(definition, options);
+}
+
+/**
+ * Validates an untrusted versioned document against the SDK's built-in
+ * generator registry without executing it.
+ */
+export function safeParseDocument(
+  value: unknown,
+  options?: SafeParseDocumentOptions,
+): DocumentParseResult {
+  return safeParseCoreDocument(value, {
+    registry: defaultRegistry,
+    limits: options?.limits,
+  });
 }
 
 /**
