@@ -49,12 +49,14 @@ describe("QuickGenerateShell", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Generate" }));
 
-    expect(screen.getByRole("alert").textContent).toContain(
-      "INVALID_RANGE at min",
-    );
-    expect(screen.getByRole("alert").textContent).toContain(
+    const alerts = screen.getAllByRole("alert");
+    expect(alerts.at(-1)?.textContent).toContain("INVALID_RANGE at min");
+    expect(alerts.at(-1)?.textContent).toContain(
       "min must be less than or equal to max",
     );
+    expect(
+      screen.getByRole("heading", { name: "Fix the generator definition" }),
+    ).not.toBeNull();
   });
 
   it("shows shared numeric validation beside the invalid control while preserving the draft", () => {
@@ -70,6 +72,89 @@ describe("QuickGenerateShell", () => {
     ).not.toBeNull();
     expect(screen.getByLabelText("Minimum").getAttribute("aria-invalid")).toBe(
       "true",
+    );
+  });
+
+  it("edits choice values as JSON without coercing their types", () => {
+    render(<QuickGenerateShell />);
+
+    fireEvent.change(screen.getByLabelText("Generator"), {
+      target: { value: "choice" },
+    });
+    fireEvent.change(screen.getByLabelText("Choices"), {
+      target: { value: '[0, false, false, "two"]' },
+    });
+
+    expect(screen.getByLabelText("Choices")).toHaveProperty(
+      "value",
+      '[\n  0,\n  false,\n  false,\n  "two"\n]',
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(screen.getByRole("status").textContent).toMatch(/^(0|false|two)$/u);
+  });
+
+  it("shows shared choice validation for empty and malformed drafts", () => {
+    render(<QuickGenerateShell />);
+
+    fireEvent.change(screen.getByLabelText("Generator"), {
+      target: { value: "choice" },
+    });
+    fireEvent.change(screen.getByLabelText("Choices"), {
+      target: { value: "[]" },
+    });
+    expect(screen.getByText("values must not be empty")).not.toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Choices"), {
+      target: { value: "not json" },
+    });
+    expect(
+      screen.getByText("choice definition must contain a values array"),
+    ).not.toBeNull();
+  });
+
+  it("configures string length and character set with shared validation", () => {
+    render(<QuickGenerateShell />);
+
+    fireEvent.change(screen.getByLabelText("Generator"), {
+      target: { value: "string" },
+    });
+    fireEvent.change(screen.getByLabelText("Length"), {
+      target: { value: "0" },
+    });
+    fireEvent.change(screen.getByLabelText("Character set"), {
+      target: { value: "numeric" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(screen.getByRole("status").textContent).toBe("");
+
+    fireEvent.change(screen.getByLabelText("Length"), {
+      target: { value: "10001" },
+    });
+    expect(
+      screen.getByText("length must be an integer from 0 to 10000"),
+    ).not.toBeNull();
+  });
+
+  it("validates date bounds and keeps UUID configuration-free", () => {
+    render(<QuickGenerateShell />);
+
+    fireEvent.change(screen.getByLabelText("Generator"), {
+      target: { value: "date" },
+    });
+    fireEvent.change(screen.getByLabelText("Minimum date"), {
+      target: { value: "2027-01-01" },
+    });
+    expect(screen.getByText("min must be on or before max")).not.toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Generator"), {
+      target: { value: "uuid" },
+    });
+    expect(
+      screen.getByText("This generator has no editable configuration."),
+    ).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(screen.getByRole("status").textContent).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
     );
   });
 

@@ -2,6 +2,10 @@ import { BUILT_IN_GENERATOR_CATALOG } from "constructa-sdk";
 import type { ComponentType } from "react";
 
 import {
+  getFieldIssue,
+  type WebFieldIssue,
+} from "../errors/error-presentation";
+import {
   DateControl,
   type DefinitionProperties,
   ListControl,
@@ -19,10 +23,7 @@ export type EditorProps = {
   readonly onChange: (properties: DefinitionProperties) => void;
 };
 
-export type EditorValidationIssue = {
-  readonly message: string;
-  readonly path: readonly (string | number)[];
-};
+export type EditorValidationIssue = WebFieldIssue;
 
 export type GeneratorEditorRegistration = {
   readonly typeId: string;
@@ -272,7 +273,7 @@ function controlProps(
 ) {
   return {
     disabled,
-    error: issues?.find((issue) => issue.path[0] === name)?.message,
+    error: getFieldIssue(issues, name)?.message,
     label,
     name,
     onChange: (value: unknown) => onChange({ ...definition, [name]: value }),

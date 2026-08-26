@@ -2,10 +2,13 @@ import { Button } from "@constructa/ui/components/button";
 import { Label } from "@constructa/ui/components/label";
 import {
   BUILT_IN_GENERATOR_CATALOG,
+  choice,
+  date,
   decimal,
   type GeneratorDefinition,
   generate,
   integer,
+  string,
 } from "constructa-sdk";
 import { useState } from "react";
 
@@ -14,18 +17,15 @@ import {
   type EditorValidationIssue,
   getGeneratorEditor,
 } from "../editor/registry";
-
-type GenerationError = {
-  readonly code: string;
-  readonly kind: string;
-  readonly message: string;
-  readonly path: readonly (string | number)[];
-};
-
-type GenerationState =
-  | { readonly status: "idle" }
-  | { readonly status: "success"; readonly value: unknown }
-  | { readonly status: "error"; readonly error: GenerationError };
+import {
+  DefinitionErrorSummary,
+  toFieldIssues,
+} from "../errors/error-presentation";
+import {
+  ResultPreview,
+  type ResultPreviewError,
+  type ResultPreviewState,
+} from "./result-preview";
 
 const DEFAULT_TYPE_ID = "integer";
 
@@ -34,7 +34,7 @@ export function QuickGenerateShell() {
   const [definition, setDefinition] = useState(() =>
     createDefinitionDraft(DEFAULT_TYPE_ID),
   );
-  const [generation, setGeneration] = useState<GenerationState>({
+  const [generation, setGeneration] = useState<ResultPreviewState>({
     status: "idle",
   });
   const [issues, setIssues] = useState<readonly EditorValidationIssue[]>([]);
@@ -49,7 +49,7 @@ export function QuickGenerateShell() {
 
   function updateDefinition(properties: DefinitionProperties) {
     setDefinition(properties);
-    setIssues(validateNumericDraft(properties));
+    setIssues(validateQuickGenerateDraft(properties));
     setGeneration({ status: "idle" });
   }
 
@@ -60,7 +60,11 @@ export function QuickGenerateShell() {
         value: generate(definition as GeneratorDefinition),
       });
     } catch (cause) {
-      setGeneration({ status: "error", error: toGenerationError(cause) });
+      const error = toGenerationError(cause);
+      if (error.kind === "configuration") {
+        setIssues(toFieldIssues([error]));
+      }
+      setGeneration({ status: "error", error });
     }
   }
 
@@ -113,6 +117,7 @@ export function QuickGenerateShell() {
               onChange={updateDefinition}
             />
           )}
+          <DefinitionErrorSummary issues={issues} />
           {hasEditableProperties(definition) ? null : (
             <p className="text-muted-foreground text-sm">
               This generator has no editable configuration.
@@ -125,37 +130,7 @@ export function QuickGenerateShell() {
         </Button>
       </section>
 
-      <section aria-labelledby="result-title" className="rounded-lg border p-5">
-        <h2 className="font-medium text-lg" id="result-title">
-          Result
-        </h2>
-        {generation.status === "idle" ? (
-          <p className="mt-3 text-muted-foreground text-sm">
-            Configure a generator, then select Generate.
-          </p>
-        ) : null}
-        {generation.status === "success" ? (
-          <output
-            aria-live="polite"
-            className="mt-3 block overflow-auto rounded bg-muted p-3 font-mono text-sm"
-          >
-            {formatResult(generation.value)}
-          </output>
-        ) : null}
-        {generation.status === "error" ? (
-          <div
-            aria-live="assertive"
-            className="mt-3 space-y-1 text-destructive"
-            role="alert"
-          >
-            <p>{generation.error.message}</p>
-            <p className="font-mono text-xs">
-              {generation.error.kind} / {generation.error.code} at{" "}
-              {formatPath(generation.error.path)}
-            </p>
-          </div>
-        ) : null}
-      </section>
+      <ResultPreview state={generation} />
     </main>
   );
 }
@@ -173,11 +148,7 @@ function hasEditableProperties(definition: DefinitionProperties): boolean {
   return Object.keys(definition).some((key) => key !== "type");
 }
 
-function formatResult(value: unknown): string {
-  return JSON.stringify(value, null, 2) ?? "undefined";
-}
-
-function toGenerationError(cause: unknown): GenerationError {
+function toGenerationError(cause: unknown): ResultPreviewError {
   if (isGenerationError(cause)) {
     return {
       code: cause.code,
@@ -194,9 +165,9 @@ function toGenerationError(cause: unknown): GenerationError {
   };
 }
 
-function isGenerationError(cause: unknown): cause is GenerationError {
+function isGenerationError(cause: unknown): cause is ResultPreviewError {
   if (typeof cause !== "object" || cause === null) return false;
-  const value = cause as Partial<GenerationError>;
+  const value = cause as Partial<ResultPreviewError>;
   return (
     typeof value.code === "string" &&
     typeof value.kind === "string" &&
@@ -205,11 +176,7 @@ function isGenerationError(cause: unknown): cause is GenerationError {
   );
 }
 
-function formatPath(path: readonly (string | number)[]): string {
-  return path.length === 0 ? "definition" : path.join(".");
-}
-
-function validateNumericDraft(
+function validateQuickGenerateDraft(
   definition: DefinitionProperties,
 ): readonly EditorValidationIssue[] {
   try {
@@ -221,6 +188,15 @@ function validateNumericDraft(
         max: definition.max as number,
         precision: definition.precision as number,
       });
+    } else if (definition.type === "choice") {
+      choice(definition.values as never);
+    } else if (definition.type === "string") {
+      string({
+        length: definition.length as number,
+        charset: definition.charset as string,
+      });
+    } else if (definition.type === "date") {
+      date({ min: definition.min as string, max: definition.max as string });
     }
     return [];
   } catch (cause) {

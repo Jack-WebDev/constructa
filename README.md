@@ -617,6 +617,16 @@ The web editor maps each built-in generator type to accessible, web-owned contro
 
 Quick Generate is available at `/quick-generate` for an anonymous, one-off run. It uses the same portable definition and shared engine as every other Constructa surface.
 
+The Choice editor accepts a JSON array, preserving values such as numbers, booleans, strings, objects, and duplicates exactly as entered. Weighted choices are not part of the initial portable generator definition.
+
+Quick Generate also supports string length and character-set controls, inclusive ISO date bounds, and configuration-free UUID generation. Time-of-day and timezone controls are intentionally unavailable until supported by portable generator definitions.
+
+Results use safe text for primitives and formatted JSON for structured values. Long previews remain scrollable and are truncated with a visible notice.
+
+Successful previews can be copied as their formatted display value. Clipboard permission failures are shown safely without exposing browser error details.
+
+Validation summaries and field errors use shared segment paths. Configuration and dependency errors explain what to correct, while system failures stay generic.
+
 Browse built-in generators at `/generators`. The catalog has normalized search across names, descriptions, and tags, category filters, and stable detail URLs such as `/generators/integer`.
 
 ---
