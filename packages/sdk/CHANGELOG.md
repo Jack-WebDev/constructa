@@ -1,5 +1,16 @@
 # constructa-sdk
 
+## 0.4.1
+
+### Patch Changes
+
+- 6e18ea8: Expose the versioned document type through the core façade and add
+  `safeParseDocument()` to the SDK for validating documents against its built-in
+  generator registry without executing them.
+- Updated dependencies [6e18ea8]
+  - constructa-core@0.9.5
+  - constructa-generators@0.5.1
+
 ## 0.4.0
 
 ### Minor Changes

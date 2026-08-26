@@ -1,6 +1,6 @@
 {
   "name": "constructa-core",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "description": "UI-agnostic registry, execution engine, and deterministic runtime for Constructa generators.",
   "private": false,
   "license": "MIT",
