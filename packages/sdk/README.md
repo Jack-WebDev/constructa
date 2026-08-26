@@ -6,25 +6,25 @@ The SDK will assemble the core engine, built-in generators, and exporters behind
 
 ## Example
 
-Use the SDK facade to create a registry, register built-ins, and generate a
-typed value without importing Constructa's internal packages directly.
+Create an engine to generate typed values with all built-ins already
+registered, without importing Constructa's internal packages directly.
 
 ```ts
 import {
-  createExecutor,
-  createRegistry,
+  createEngine,
   integer,
-  registerIntegerGenerator,
 } from "jsr:@constructa/sdk";
 
-const registry = createRegistry();
-registerIntegerGenerator(registry);
-
-const executor = createExecutor(registry);
-const age = executor.generate(integer({ min: 18, max: 65 }), {
+const engine = createEngine();
+const age = engine.generate(integer({ min: 18, max: 65 }), {
   seed: "example",
 });
 ```
+
+`createEngine({ registry?, random?, limits? })` is available for advanced
+customization. A supplied registry replaces the built-in registry and is
+snapshotted when the engine is created; later registry mutations do not affect
+the engine. Each engine instance is isolated.
 
 ## Dependency boundary
 
