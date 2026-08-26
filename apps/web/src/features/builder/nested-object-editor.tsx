@@ -1,6 +1,10 @@
 import { Button } from "@constructa/ui/components/button";
 import { useState } from "react";
-
+import {
+  BuilderInlineValidationIssues,
+  type BuilderValidationIssue,
+  getDefinitionValidationIssues,
+} from "./builder-validation";
 import {
   addBuilderObjectField,
   type BuilderDocumentDraft,
@@ -20,6 +24,7 @@ type NestedObjectEditorProps = {
     fieldId: BuilderUiId,
     element: HTMLLIElement | null,
   ) => void;
+  readonly validationIssues: readonly BuilderValidationIssue[];
 };
 
 /** Recursively presents fields owned by a nested object definition. */
@@ -31,6 +36,7 @@ export function NestedObjectEditor({
   onDraftChange,
   onFieldFocus,
   registerFieldRef,
+  validationIssues,
 }: NestedObjectEditorProps) {
   const [collapsed, setCollapsed] = useState(false);
   const fields = getBuilderObjectFields(draft, objectPath);
@@ -87,6 +93,7 @@ export function NestedObjectEditor({
               onDraftChange={onDraftChange}
               onFieldFocus={onFieldFocus}
               registerFieldRef={registerFieldRef}
+              validationIssues={validationIssues}
             />
           ))}
         </ul>
@@ -103,15 +110,21 @@ function NestedField({
   onDraftChange,
   onFieldFocus,
   registerFieldRef,
+  validationIssues,
 }: Omit<NestedObjectEditorProps, "objectPath"> & {
   readonly field: BuilderFieldDraft;
 }) {
   const isObject = getGeneratorType(field.definition) === "object";
+  const fieldIssues = getDefinitionValidationIssues(
+    validationIssues,
+    field.path,
+  );
 
   return (
     <li
       aria-label={`Field ${field.name}`}
       className="rounded border bg-muted/30 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      id={`builder-field-${field.id}`}
       ref={(element) => registerFieldRef(field.id, element)}
       tabIndex={-1}
     >
@@ -121,6 +134,7 @@ function NestedField({
           ? "Object"
           : (getGeneratorType(field.definition) ?? "Unknown generator")}
       </span>
+      <BuilderInlineValidationIssues issues={fieldIssues} />
       {isObject ? (
         <NestedObjectEditor
           breadcrumbs={[...breadcrumbs, field.name]}
@@ -130,6 +144,7 @@ function NestedField({
           onDraftChange={onDraftChange}
           onFieldFocus={onFieldFocus}
           registerFieldRef={registerFieldRef}
+          validationIssues={validationIssues}
         />
       ) : null}
     </li>

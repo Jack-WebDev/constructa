@@ -615,6 +615,14 @@ The goal is for moving between **TypeScript, JSON, and the visual Builder** to f
 
 The web editor maps each built-in generator type to accessible, web-owned controls. Those controls update the same flat portable properties used by the TypeScript factories; final validation and execution still run through the shared Constructa engine.
 
+The Builder includes a debounced live preview and a Regenerate control. Invalid drafts remain editable and report that preview is unavailable. An optional preview seed makes that UI preview reproducible; it is never stored in the generator document.
+
+Builder validation uses the shared portable-document parser and reports issues both beside the affected field (including nested fields) and in a linked summary. Selecting a summary item moves focus to its field, and validation feedback is announced to assistive technology.
+
+The Builder can import a pasted or `.json` versioned generator document. It validates the complete document, including generator references, before asking for confirmation; bare definitions are not accepted and an invalid import never replaces the current draft.
+
+Validated Builder documents can be copied or downloaded as canonical JSON; generated preview values and Builder-only state are never exported. Builder drafts are also saved locally in the current browser for up to seven days, with explicit restore or discard controls. Do not use local recovery for sensitive documents on a shared device.
+
 Quick Generate is available at `/quick-generate` for an anonymous, one-off run. It uses the same portable definition and shared engine as every other Constructa surface.
 
 The Choice editor accepts a JSON array, preserving values such as numbers, booleans, strings, objects, and duplicates exactly as entered. Weighted choices are not part of the initial portable generator definition.

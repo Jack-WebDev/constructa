@@ -26,6 +26,30 @@ describe("BuilderShell", () => {
     );
   });
 
+  it("imports a confirmed versioned document into the builder", () => {
+    render(<BuilderShell />);
+    const imported = {
+      schemaVersion: 1,
+      name: "Imported employee",
+      definition: { type: "object", fields: { id: { type: "uuid" } } },
+    };
+
+    fireEvent.change(screen.getByLabelText("Generator document JSON"), {
+      target: { value: JSON.stringify(imported) },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Review import" }));
+    fireEvent.click(screen.getByRole("button", { name: "Import document" }));
+
+    expect(screen.getByLabelText("Name")).toHaveProperty(
+      "value",
+      "Imported employee",
+    );
+    expect(
+      screen.getByRole("listitem", { name: "Field id" }).textContent,
+    ).toContain("UUID");
+    expect(screen.getByText("Generator document imported.")).not.toBeNull();
+  });
+
   it("announces identity updates after a control loses focus", () => {
     render(<BuilderShell />);
 
@@ -215,6 +239,28 @@ describe("BuilderShell", () => {
     ).not.toBeNull();
     expect(screen.getByLabelText("Minimum").getAttribute("aria-invalid")).toBe(
       "true",
+    );
+  });
+
+  it("summarizes invalid drafts and moves focus from a validation link", () => {
+    render(<BuilderShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change generator" }));
+    fireEvent.click(screen.getByRole("button", { name: /Integer/u }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure" }));
+    fireEvent.change(screen.getByLabelText("Minimum"), {
+      target: { value: "200" },
+    });
+
+    const summary = screen.getByRole("alert");
+    expect(summary.textContent).toContain("Fix the generator definition");
+    const link = screen.getByRole("link", {
+      name: /definition\.fields\.field\.min: min must be less/u,
+    });
+    fireEvent.click(link);
+    expect(document.activeElement).toBe(
+      screen.getByRole("listitem", { name: "Field field" }),
     );
   });
 
