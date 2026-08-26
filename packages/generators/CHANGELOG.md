@@ -1,5 +1,14 @@
 # constructa-generators
 
+## 0.5.2
+
+### Patch Changes
+
+- e8e933d: Verify published package artifacts in a clean npm consumer and use installable semver ranges for internal package dependencies.
+- Updated dependencies [e8e933d]
+  - constructa-schema@2.5.1
+  - constructa-core@0.9.6
+
 ## 0.5.1
 
 ### Patch Changes

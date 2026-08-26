@@ -1,6 +1,6 @@
 {
   "name": "constructa-generators",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Built-in composable generator definitions and implementations for Constructa.",
   "private": false,
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "constructa-sdk",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Ergonomic developer API for defining and executing Constructa generators.",
   "private": false,
   "license": "MIT",
