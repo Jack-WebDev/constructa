@@ -623,6 +623,10 @@ The Builder can import a pasted or `.json` versioned generator document. It vali
 
 Validated Builder documents can be copied or downloaded as canonical JSON; generated preview values and Builder-only state are never exported. Builder drafts are also saved locally in the current browser for up to seven days, with explicit restore or discard controls. Do not use local recovery for sensitive documents on a shared device.
 
+The MVP journey is available entirely in the browser: build an Employee object from UUID, integer, choice, and boolean fields; add a nested object; then use Live preview or Regenerate to run that same portable definition.
+
+Cross-surface contract tests keep seeded definitions, serialized documents, Builder import/export, and browser preview aligned with the same shared engine and structured errors.
+
 Quick Generate is available at `/quick-generate` for an anonymous, one-off run. It uses the same portable definition and shared engine as every other Constructa surface.
 
 The Choice editor accepts a JSON array, preserving values such as numbers, booleans, strings, objects, and duplicates exactly as entered. Weighted choices are not part of the initial portable generator definition.
