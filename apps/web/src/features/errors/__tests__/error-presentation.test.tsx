@@ -7,7 +7,7 @@ import {
   getFieldIssue,
   toFieldIssues,
   type WebError,
-} from "./error-presentation";
+} from "../error-presentation";
 
 afterEach(cleanup);
 
