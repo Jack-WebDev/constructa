@@ -183,6 +183,41 @@ describe("BuilderShell", () => {
     expect(screen.getByText("Field field now uses UUID.")).not.toBeNull();
   });
 
+  it("edits flat field generator properties through web-owned controls", () => {
+    render(<BuilderShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change generator" }));
+    fireEvent.click(screen.getByRole("button", { name: /Integer/u }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure" }));
+    fireEvent.change(screen.getByLabelText("Minimum"), {
+      target: { value: "21" },
+    });
+
+    expect(screen.getByLabelText("Minimum")).toHaveProperty("value", "21");
+    expect(screen.getByLabelText("Maximum")).toHaveProperty("value", "100");
+  });
+
+  it("preserves invalid field configuration drafts and shows canonical feedback", () => {
+    render(<BuilderShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change generator" }));
+    fireEvent.click(screen.getByRole("button", { name: /Integer/u }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure" }));
+    fireEvent.change(screen.getByLabelText("Minimum"), {
+      target: { value: "200" },
+    });
+
+    expect(screen.getByLabelText("Minimum")).toHaveProperty("value", "200");
+    expect(
+      screen.getByText("min must be less than or equal to max"),
+    ).not.toBeNull();
+    expect(screen.getByLabelText("Minimum").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
+  });
+
   it("cancels field removal without changing the field", () => {
     render(<BuilderShell />);
 

@@ -5,6 +5,7 @@ import {
   addBuilderField,
   type BuilderDocumentConversion,
   type BuilderDocumentDraft,
+  type BuilderFieldDefinitionUpdate,
   type BuilderFieldGeneratorSelection,
   type BuilderFieldMove,
   createBuilderDraft,
@@ -18,6 +19,7 @@ import {
   selectBuilderFieldGenerator,
   toGeneratorDocument,
   updateBuilderDocumentIdentity,
+  updateBuilderFieldDefinition,
 } from "./state";
 
 function deterministicIds(): () => string {
@@ -583,6 +585,88 @@ describe("builder document draft state", () => {
     expect(result).toEqual({ success: true, draft, field: age });
   });
 
+  it("updates flat field properties without adding a configuration envelope", () => {
+    const draft = createBuilderDraft(
+      {
+        schemaVersion: 1,
+        definition: {
+          type: "object",
+          fields: { age: { type: "integer", min: 18, max: 65 } },
+        },
+      },
+      { createId: deterministicIds() },
+    );
+    const age = getBuilderFields(draft)[0];
+    const result = updateBuilderFieldDefinition(draft, age.id, {
+      type: "integer",
+      min: 21,
+      max: 70,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected configuration to update");
+    expect(result.field.definition).toEqual({
+      type: "integer",
+      min: 21,
+      max: 70,
+    });
+    expect(toGeneratorDocument(result.draft).success).toBe(true);
+  });
+
+  it("preserves invalid field configuration drafts for canonical validation", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: {
+        type: "object",
+        fields: { age: { type: "integer", min: 18, max: 65 } },
+      },
+    });
+    const age = getBuilderFields(draft)[0];
+    const result = updateBuilderFieldDefinition(draft, age.id, {
+      type: "integer",
+      min: "not-a-number",
+      max: 65,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected invalid draft preservation");
+    expect(result.field.definition).toEqual({
+      type: "integer",
+      min: "not-a-number",
+      max: 65,
+    });
+    expect(toGeneratorDocument(result.draft)).toEqual({
+      success: false,
+      errors: [
+        expect.objectContaining({
+          code: "INVALID_RANGE",
+          kind: "configuration",
+          path: ["definition", "fields", "age", "min"],
+        }),
+      ],
+    });
+  });
+
+  it("rejects field configuration that changes the selected generator", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: { type: "object", fields: { age: { type: "boolean" } } },
+    });
+    const age = getBuilderFields(draft)[0];
+
+    expect(
+      updateBuilderFieldDefinition(draft, age.id, { type: "integer" }),
+    ).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "Field configuration cannot change the selected generator.",
+        path: ["definition", "fields", "age", "type"],
+      },
+    });
+  });
+
   it("rejects selecting a generator for a stale field", () => {
     const draft = createBuilderDraft({
       schemaVersion: 1,
@@ -640,6 +724,9 @@ describe("builder document draft state", () => {
       readonly success: boolean;
     }>();
     expectTypeOf<BuilderFieldGeneratorSelection>().toMatchTypeOf<{
+      readonly success: boolean;
+    }>();
+    expectTypeOf<BuilderFieldDefinitionUpdate>().toMatchTypeOf<{
       readonly success: boolean;
     }>();
   });

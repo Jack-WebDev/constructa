@@ -1,7 +1,13 @@
 import { Button } from "@constructa/ui/components/button";
 import { Input } from "@constructa/ui/components/input";
 import { useEffect, useRef, useState } from "react";
+
 import { getCatalogEntry, searchGeneratorCatalog } from "../catalog/catalog";
+import type { DefinitionProperties } from "../editor/controls";
+import {
+  type EditorValidationIssue,
+  getGeneratorEditor,
+} from "../editor/registry";
 import { BuilderIdentityEditor } from "./identity-editor";
 import {
   addBuilderField,
@@ -12,6 +18,8 @@ import {
   removeBuilderField,
   renameBuilderField,
   selectBuilderFieldGenerator,
+  toGeneratorDocument,
+  updateBuilderFieldDefinition,
 } from "./state";
 
 const INITIAL_DOCUMENT = {
@@ -28,6 +36,7 @@ export function BuilderShell() {
   >();
   const [fieldToRemove, setFieldToRemove] = useState<string>();
   const [fieldToChange, setFieldToChange] = useState<string>();
+  const [fieldToConfigure, setFieldToConfigure] = useState<string>();
   const [generatorSearches, setGeneratorSearches] = useState<
     Record<string, string>
   >({});
@@ -36,6 +45,9 @@ export function BuilderShell() {
   >();
   const [fieldNames, setFieldNames] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [configurationIssues, setConfigurationIssues] = useState<
+    Record<string, readonly EditorValidationIssue[]>
+  >({});
   const [announcement, setAnnouncement] = useState("");
   const fieldRefs = useRef(new Map<string, HTMLLIElement>());
   const addFieldButtonRef = useRef<HTMLButtonElement>(null);
@@ -132,6 +144,27 @@ export function BuilderShell() {
     selectFieldGenerator(fieldId, typeId);
   }
 
+  function configureField(fieldId: string, properties: DefinitionProperties) {
+    const result = updateBuilderFieldDefinition(draft, fieldId, properties);
+    if (!result.success) return;
+
+    setDraft(result.draft);
+    setConfigurationIssues((issues) => ({
+      ...issues,
+      [fieldId]: getConfigurationIssues(result.draft, result.field),
+    }));
+  }
+
+  function openConfiguration(fieldId: string) {
+    const field = fields.find((candidate) => candidate.id === fieldId);
+    if (field === undefined) return;
+    setFieldToConfigure(fieldId);
+    setConfigurationIssues((issues) => ({
+      ...issues,
+      [fieldId]: getConfigurationIssues(draft, field),
+    }));
+  }
+
   return (
     <main className="container mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-12">
       <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
@@ -189,6 +222,9 @@ export function BuilderShell() {
                   pendingGeneratorSelection?.fieldId === field.id
                     ? pendingGeneratorSelection
                     : undefined;
+                const editor =
+                  typeId === undefined ? undefined : getGeneratorEditor(typeId);
+                const Editor = editor?.Editor;
 
                 return (
                   <li
@@ -252,6 +288,14 @@ export function BuilderShell() {
                           Change generator
                         </Button>
                         <Button
+                          onClick={() => openConfiguration(field.id)}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          Configure
+                        </Button>
+                        <Button
                           aria-label={`Move ${field.name} up`}
                           disabled={index === 0}
                           onClick={() => moveField(field.id, "up")}
@@ -289,6 +333,52 @@ export function BuilderShell() {
                       >
                         {fieldErrors[field.id]}
                       </p>
+                    )}
+                    {fieldToConfigure !== field.id ? null : (
+                      <section
+                        aria-labelledby={`field-configuration-title-${field.id}`}
+                        className="mt-3 border-t pt-3"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <h3
+                            className="font-medium"
+                            id={`field-configuration-title-${field.id}`}
+                          >
+                            Configure {catalogEntry?.displayName ?? "field"}
+                          </h3>
+                          <Button
+                            onClick={() => setFieldToConfigure(undefined)}
+                            size="sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            Close
+                          </Button>
+                        </div>
+                        <div className="mt-3">
+                          {Editor === undefined ? (
+                            <p role="alert">
+                              The selected generator is not available.
+                            </p>
+                          ) : (
+                            <Editor
+                              definition={asDefinitionProperties(
+                                field.definition,
+                              )}
+                              issues={configurationIssues[field.id]}
+                              onChange={(properties) =>
+                                configureField(field.id, properties)
+                              }
+                            />
+                          )}
+                          {Editor === undefined ||
+                          hasGeneratorConfiguration(field.definition) ? null : (
+                            <p className="text-muted-foreground text-sm">
+                              This generator has no editable configuration.
+                            </p>
+                          )}
+                        </div>
+                      </section>
                     )}
                     {fieldToChange !== field.id ? null : (
                       <section
@@ -466,4 +556,25 @@ function getGeneratorType(definition: unknown): string | undefined {
 function hasGeneratorConfiguration(definition: unknown): boolean {
   if (typeof definition !== "object" || definition === null) return false;
   return Object.keys(definition).some((key) => key !== "type");
+}
+
+function asDefinitionProperties(definition: unknown): DefinitionProperties {
+  return typeof definition === "object" && definition !== null
+    ? (definition as DefinitionProperties)
+    : {};
+}
+
+function getConfigurationIssues(
+  draft: Parameters<typeof toGeneratorDocument>[0],
+  field: { readonly name: string },
+): readonly EditorValidationIssue[] {
+  const conversion = toGeneratorDocument(draft);
+  if (conversion.success) return [];
+  const prefix = ["definition", "fields", field.name];
+  return conversion.errors.flatMap((error) => {
+    if (!prefix.every((segment, index) => error.path[index] === segment)) {
+      return [];
+    }
+    return [{ message: error.message, path: error.path.slice(prefix.length) }];
+  });
 }

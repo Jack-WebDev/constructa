@@ -105,6 +105,15 @@ export type BuilderFieldGeneratorSelection =
     }
   | { readonly success: false; readonly error: BuilderDraftError };
 
+/** The result of updating a field's flat portable definition properties. */
+export type BuilderFieldDefinitionUpdate =
+  | {
+      readonly success: true;
+      readonly draft: BuilderDocumentDraft;
+      readonly field: BuilderFieldDraft;
+    }
+  | { readonly success: false; readonly error: BuilderDraftError };
+
 export type CreateBuilderDraftOptions = {
   /** Supplies deterministic IDs for tests or application-owned state stores. */
   readonly createId?: () => BuilderUiId;
@@ -561,6 +570,88 @@ export function selectBuilderFieldGenerator(
 }
 
 /**
+ * Updates one field through flat portable generator properties. Invalid drafts
+ * are retained so the shared parser can report feedback without losing input.
+ */
+export function updateBuilderFieldDefinition(
+  draft: BuilderDocumentDraft,
+  fieldId: BuilderUiId,
+  definition: unknown,
+): BuilderFieldDefinitionUpdate {
+  const fields = getRootObjectFields(draft?.document);
+  if (fields === undefined) return invalidFieldDefinitionUpdate();
+
+  const field = getBuilderFields(draft).find(
+    (candidate) => candidate.id === fieldId,
+  );
+  if (field === undefined) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "The field to update no longer exists.",
+        path: ["definition", "fields"],
+      },
+    };
+  }
+
+  const properties = asRecord(definition);
+  const currentType = getDefinitionType(field.definition);
+  if (properties === undefined || typeof properties.type !== "string") {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "Field configuration must be a flat generator definition.",
+        path: [...field.path],
+      },
+    };
+  }
+  if (properties.type !== currentType) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "Field configuration cannot change the selected generator.",
+        path: [...field.path, "type"],
+      },
+    };
+  }
+
+  const document = asRecord(draft.document);
+  const objectDefinition =
+    document === undefined ? undefined : asRecord(document.definition);
+  if (document === undefined || objectDefinition === undefined)
+    return invalidFieldDefinitionUpdate();
+
+  const nextDraft = replaceBuilderDraftDocument(draft, {
+    ...document,
+    definition: {
+      ...objectDefinition,
+      fields: { ...fields, [field.name]: { ...properties } },
+    },
+  });
+  const updatedField = getBuilderFields(nextDraft).find(
+    (candidate) => candidate.id === fieldId,
+  );
+  if (updatedField === undefined) {
+    return {
+      success: false,
+      error: {
+        code: "SYSTEM_ERROR",
+        kind: "system",
+        message: "Unable to update the field configuration.",
+        path: field.path,
+      },
+    };
+  }
+  return { success: true, draft: nextDraft, field: updatedField };
+}
+
+/**
  * Validates the raw draft through the SDK's canonical parser without mutating
  * it. UI-only identities are deliberately excluded from the portable output.
  */
@@ -694,6 +785,19 @@ function invalidFieldOperation(
       code: "INVALID_CONFIGURATION",
       kind: "configuration",
       message: `Fields can only be ${operation} on an object generator.`,
+      path: ["definition"],
+    },
+  };
+}
+
+function invalidFieldDefinitionUpdate(): BuilderFieldDefinitionUpdate {
+  return {
+    success: false,
+    error: {
+      code: "INVALID_CONFIGURATION",
+      kind: "configuration",
+      message:
+        "Field configuration can only be updated on an object generator.",
       path: ["definition"],
     },
   };
