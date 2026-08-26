@@ -13,6 +13,7 @@ import {
 
 export type {
   GeneratorDefinition,
+  GeneratorDocumentV1,
   Infer,
   ValidationIssue,
   ValidationPath,

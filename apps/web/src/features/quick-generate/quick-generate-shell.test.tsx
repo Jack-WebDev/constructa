@@ -38,6 +38,66 @@ describe("QuickGenerateShell", () => {
     );
   });
 
+  it("uses a mobile-first layout with touch-sized controls and a bounded preview", () => {
+    render(<QuickGenerateShell />);
+
+    expect(screen.getByRole("main").className).toContain(
+      "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
+    );
+    expect(screen.getByLabelText("Generator").className).toContain("h-11");
+    expect(screen.getByLabelText("Minimum").className).toContain("h-11");
+    expect(
+      screen.getByRole("button", { name: "Generate" }).className,
+    ).toContain("h-11");
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    expect(screen.getByRole("status").className).toContain("max-h-[50dvh]");
+    expect(screen.getByRole("status").className).toContain(
+      "overscroll-contain",
+    );
+  });
+
+  it("preserves labelled keyboard submission and live result feedback", () => {
+    render(<QuickGenerateShell />);
+
+    const form = screen.getByRole("form", { name: "Generate one value." });
+    expect(form.getAttribute("aria-describedby")).toBe(
+      "quick-generate-description",
+    );
+    expect(screen.getByLabelText("Generator").className).toContain(
+      "focus-visible:ring-2",
+    );
+    expect(screen.getByLabelText("Minimum").className).toContain(
+      "focus-visible:ring-2",
+    );
+
+    fireEvent.submit(form);
+
+    expect(screen.getByRole("status").getAttribute("aria-label")).toBe(
+      "Generated result",
+    );
+    expect(screen.getByText("Generated result ready.")).not.toBeNull();
+  });
+
+  it("moves focus to the first invalid field after keyboard submission", () => {
+    render(<QuickGenerateShell />);
+
+    fireEvent.change(screen.getByLabelText("Minimum"), {
+      target: { value: "200" },
+    });
+    fireEvent.change(screen.getByLabelText("Maximum"), {
+      target: { value: "10" },
+    });
+    fireEvent.submit(screen.getByRole("form", { name: "Generate one value." }));
+
+    expect(document.activeElement).toBe(screen.getByLabelText("Minimum"));
+    expect(
+      screen
+        .getAllByRole("alert")
+        .some((alert) => alert.className.includes("text-destructive")),
+    ).toBe(true);
+  });
+
   it("surfaces shared validation errors with their stable code and path", () => {
     render(<QuickGenerateShell />);
 
