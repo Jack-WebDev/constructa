@@ -11,6 +11,7 @@ import {
   array,
   arrayGenerator,
   type BooleanDefinition,
+  BUILT_IN_GENERATOR_CATALOG,
   boolean,
   booleanGenerator,
   choice,
@@ -41,6 +42,33 @@ import {
   uuid,
   uuidGenerator,
 } from "./index";
+
+describe("built-in generator catalog", () => {
+  it("exposes unique semantic metadata with portable examples", () => {
+    expect(BUILT_IN_GENERATOR_CATALOG).toHaveLength(10);
+    expect(BUILT_IN_GENERATOR_CATALOG.map((entry) => entry.typeId)).toEqual([
+      "array",
+      "boolean",
+      "choice",
+      "date",
+      "decimal",
+      "integer",
+      "object",
+      "string",
+      "template",
+      "uuid",
+    ]);
+    expect(
+      new Set(BUILT_IN_GENERATOR_CATALOG.map((entry) => entry.typeId)).size,
+    ).toBe(BUILT_IN_GENERATOR_CATALOG.length);
+
+    for (const entry of BUILT_IN_GENERATOR_CATALOG) {
+      expect(entry.examples).not.toHaveLength(0);
+      expect(new Set(entry.tags).size).toBe(entry.tags.length);
+      expect(JSON.parse(JSON.stringify(entry))).toEqual(entry);
+    }
+  });
+});
 
 describe("integer", () => {
   it("creates a portable definition with number output inference", () => {

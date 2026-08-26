@@ -204,6 +204,7 @@ export type GeneratorMetadata = {
   readonly displayName?: string;
   readonly description?: string;
   readonly category?: SemanticMetadataId;
+  readonly tags?: readonly SemanticMetadataId[];
   readonly outputCategory?: GeneratorOutputCategory;
   readonly documentationUrl?: string;
   readonly examples?: readonly JsonValue[];
@@ -223,6 +224,7 @@ export const GENERATOR_METADATA_KEYS = [
   "displayName",
   "description",
   "category",
+  "tags",
   "outputCategory",
   "documentationUrl",
   "examples",
@@ -276,6 +278,8 @@ export type GeneratorMetadataFailureCode =
   | "metadata_display_name_invalid"
   | "metadata_description_invalid"
   | "metadata_category_invalid"
+  | "metadata_tags_invalid"
+  | "metadata_tags_duplicate"
   | "metadata_output_category_invalid"
   | "metadata_documentation_url_invalid"
   | "metadata_examples_invalid"
@@ -772,6 +776,31 @@ function findGeneratorMetadataFailure(
     }
   }
 
+  if (Object.hasOwn(value, "tags")) {
+    if (!Array.isArray(value.tags)) {
+      return metadataFailure(
+        "metadata_tags_invalid",
+        appendPathSegment(path, "tags"),
+      );
+    }
+    const tags = new Set<string>();
+    for (const [index, tag] of value.tags.entries()) {
+      if (typeof tag !== "string" || !isMetadataId(tag)) {
+        return metadataFailure(
+          "metadata_tags_invalid",
+          appendPathSegment(appendPathSegment(path, "tags"), index),
+        );
+      }
+      if (tags.has(tag)) {
+        return metadataFailure(
+          "metadata_tags_duplicate",
+          appendPathSegment(appendPathSegment(path, "tags"), index),
+        );
+      }
+      tags.add(tag);
+    }
+  }
+
   for (const property of [
     "displayName",
     "description",
@@ -865,6 +894,9 @@ function metadataFailure(
     metadata_display_name_invalid: "displayName must be a string when present",
     metadata_description_invalid: "description must be a string when present",
     metadata_category_invalid: "category must be a stable metadata ID",
+    metadata_tags_invalid:
+      "tags must be an array of stable, non-empty metadata IDs",
+    metadata_tags_duplicate: "tags must not contain duplicates",
     metadata_output_category_invalid:
       "outputCategory must be a stable metadata ID",
     metadata_documentation_url_invalid:

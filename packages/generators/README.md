@@ -4,6 +4,11 @@ Built-in generator implementations for Constructa.
 
 The first implementation set will include integer, boolean, choice, decimal, string, date, UUID, object, array, and template generators. Each generator should own its configuration validation, metadata, implementation, and tests while conforming to the common core contract.
 
+`BUILT_IN_GENERATOR_CATALOG` exposes portable semantic metadata for those
+generators, including stable type IDs, names, descriptions, categories, tags,
+output categories, and definition examples. Presentation concerns such as
+editor components and icons belong to consuming applications.
+
 ## Example
 
 Create a portable definition with the built-in factories. Execute it after
