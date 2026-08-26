@@ -1,5 +1,12 @@
 # constructa-generators
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [6e18ea8]
+  - constructa-core@0.9.5
+
 ## 0.5.0
 
 ### Minor Changes
