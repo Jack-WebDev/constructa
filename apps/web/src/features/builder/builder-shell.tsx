@@ -12,7 +12,9 @@ import {
   getDefinitionValidationIssues,
   validateBuilderDraft,
 } from "./builder-validation";
+import { BuilderDocumentExport } from "./document-export";
 import { BuilderDocumentImport } from "./document-import";
+import { BuilderDraftRecoveryNotice } from "./draft-recovery";
 import { BuilderIdentityEditor } from "./identity-editor";
 import { LivePreview } from "./live-preview";
 import { NestedObjectEditor } from "./nested-object-editor";
@@ -196,6 +198,11 @@ export function BuilderShell() {
     setAnnouncement("Generator document imported.");
   }
 
+  function restoreDocument(document: unknown) {
+    importDocument(document);
+    setAnnouncement("Local draft restored.");
+  }
+
   return (
     <main className="container mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,0.65fr)]">
       <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
@@ -212,6 +219,8 @@ export function BuilderShell() {
           </p>
         </div>
         <BuilderDocumentImport onImport={importDocument} />
+        <BuilderDocumentExport draft={draft} />
+        <BuilderDraftRecoveryNotice draft={draft} onRestore={restoreDocument} />
         <div className="mt-8 border-t pt-6">
           <BuilderIdentityEditor draft={draft} onDraftChange={setDraft} />
         </div>

@@ -621,6 +621,8 @@ Builder validation uses the shared portable-document parser and reports issues b
 
 The Builder can import a pasted or `.json` versioned generator document. It validates the complete document, including generator references, before asking for confirmation; bare definitions are not accepted and an invalid import never replaces the current draft.
 
+Validated Builder documents can be copied or downloaded as canonical JSON; generated preview values and Builder-only state are never exported. Builder drafts are also saved locally in the current browser for up to seven days, with explicit restore or discard controls. Do not use local recovery for sensitive documents on a shared device.
+
 Quick Generate is available at `/quick-generate` for an anonymous, one-off run. It uses the same portable definition and shared engine as every other Constructa surface.
 
 The Choice editor accepts a JSON array, preserving values such as numbers, booleans, strings, objects, and duplicates exactly as entered. Weighted choices are not part of the initial portable generator definition.
