@@ -12,7 +12,7 @@ import {
   formatPreview,
   ResultPreview,
   type ResultPreviewState,
-} from "./result-preview";
+} from "../result-preview";
 
 afterEach(cleanup);
 

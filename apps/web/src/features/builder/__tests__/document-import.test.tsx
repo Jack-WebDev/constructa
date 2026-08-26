@@ -12,7 +12,7 @@ import {
   type BuilderDocumentImportResult,
   MAX_DOCUMENT_IMPORT_BYTES,
   parseBuilderDocumentImport,
-} from "./document-import";
+} from "../document-import";
 
 afterEach(cleanup);
 

@@ -8,10 +8,10 @@ import {
 import { generate, safeParseDocument, serializeDocument } from "constructa-sdk";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createBuilderDocumentExport } from "./document-export";
-import { parseBuilderDocumentImport } from "./document-import";
-import { LIVE_PREVIEW_DEBOUNCE_MS, LivePreview } from "./live-preview";
-import { createBuilderDraft } from "./state";
+import { createBuilderDocumentExport } from "../document-export";
+import { parseBuilderDocumentImport } from "../document-import";
+import { LIVE_PREVIEW_DEBOUNCE_MS, LivePreview } from "../live-preview";
+import { createBuilderDraft } from "../state";
 
 const SEEDED_DOCUMENT = {
   schemaVersion: 1,

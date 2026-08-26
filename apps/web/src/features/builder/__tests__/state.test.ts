@@ -23,7 +23,7 @@ import {
   toGeneratorDocument,
   updateBuilderDocumentIdentity,
   updateBuilderFieldDefinition,
-} from "./state";
+} from "../state";
 
 function deterministicIds(): () => string {
   let index = 0;

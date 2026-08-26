@@ -6,9 +6,9 @@ import {
   BuilderValidationSummary,
   getDefinitionValidationIssues,
   validateBuilderDraft,
-} from "./builder-validation";
-import { NestedObjectEditor } from "./nested-object-editor";
-import { createBuilderDraft } from "./state";
+} from "../builder-validation";
+import { NestedObjectEditor } from "../nested-object-editor";
+import { createBuilderDraft } from "../state";
 
 describe("validateBuilderDraft", () => {
   it("returns template dependency errors from the shared execution path", () => {

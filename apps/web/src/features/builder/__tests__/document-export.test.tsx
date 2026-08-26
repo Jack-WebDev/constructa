@@ -5,8 +5,8 @@ import {
   BuilderDocumentExport,
   type BuilderDocumentExport as BuilderDocumentExportResult,
   createBuilderDocumentExport,
-} from "./document-export";
-import { createBuilderDraft } from "./state";
+} from "../document-export";
+import { createBuilderDraft } from "../state";
 
 const DOCUMENT = {
   schemaVersion: 1,

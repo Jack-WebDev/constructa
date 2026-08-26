@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
-import { QuickGenerateShell } from "./quick-generate-shell";
+import { QuickGenerateShell } from "../quick-generate-shell";
 
 afterEach(cleanup);
 

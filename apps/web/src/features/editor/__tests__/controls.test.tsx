@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
-
 import {
   BooleanControl,
   DateControl,
@@ -9,7 +8,7 @@ import {
   NumberControl,
   SelectControl,
   TextControl,
-} from "./controls";
+} from "../controls";
 
 describe("editor controls", () => {
   it("maps number drafts to numbers and preserves empty drafts", () => {
