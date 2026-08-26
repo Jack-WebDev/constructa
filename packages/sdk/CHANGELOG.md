@@ -1,5 +1,11 @@
 # constructa-sdk
 
+## 0.3.0
+
+### Minor Changes
+
+- da6f412: Add `createEngine` with automatic built-in registration and advanced registry, random-source, and parsing-limit overrides.
+
 ## 0.2.1
 
 ### Patch Changes
