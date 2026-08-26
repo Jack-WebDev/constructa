@@ -719,6 +719,72 @@ describe("builder document draft state", () => {
     });
   });
 
+  it("preserves array item and length drafts at their portable paths", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: {
+        type: "object",
+        fields: {
+          tags: {
+            type: "array",
+            item: { type: "integer", min: 1, max: 3 },
+            length: 3,
+          },
+        },
+      },
+    });
+    const tags = getBuilderFields(draft)[0];
+    const result = updateBuilderFieldDefinition(draft, tags.id, {
+      type: "array",
+      item: { type: "integer", min: "invalid", max: 3 },
+      length: 0,
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected an array draft update");
+    expect(result.field.definition).toEqual({
+      type: "array",
+      item: { type: "integer", min: "invalid", max: 3 },
+      length: 0,
+    });
+    expect(toGeneratorDocument(result.draft)).toEqual({
+      success: false,
+      errors: [
+        expect.objectContaining({
+          code: "INVALID_RANGE",
+          path: ["definition", "fields", "tags", "item", "min"],
+        }),
+      ],
+    });
+  });
+
+  it("preserves malformed template drafts and reports their source path", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: {
+        type: "object",
+        fields: { greeting: { type: "template", source: "Hello" } },
+      },
+    });
+    const greeting = getBuilderFields(draft)[0];
+    const result = updateBuilderFieldDefinition(draft, greeting.id, {
+      type: "template",
+      source: "{",
+    });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected a template draft update");
+    expect(toGeneratorDocument(result.draft)).toEqual({
+      success: false,
+      errors: [
+        expect.objectContaining({
+          code: "INVALID_TEMPLATE_TOKEN",
+          path: ["definition", "fields", "greeting", "source"],
+        }),
+      ],
+    });
+  });
+
   it("rejects selecting a generator for a stale field", () => {
     const draft = createBuilderDraft({
       schemaVersion: 1,

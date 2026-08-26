@@ -1,5 +1,6 @@
 import { Button } from "@constructa/ui/components/button";
 import { Input } from "@constructa/ui/components/input";
+import { generate } from "constructa-sdk";
 import { useEffect, useRef, useState } from "react";
 
 import { getCatalogEntry, searchGeneratorCatalog } from "../catalog/catalog";
@@ -8,6 +9,7 @@ import {
   type EditorValidationIssue,
   getGeneratorEditor,
 } from "../editor/registry";
+import { ArrayFieldEditor } from "./array-field-editor";
 import { BuilderIdentityEditor } from "./identity-editor";
 import { NestedObjectEditor } from "./nested-object-editor";
 import {
@@ -15,6 +17,7 @@ import {
   type BuilderFieldMoveDirection,
   createBuilderDraft,
   getBuilderFields,
+  getBuilderObjectFields,
   moveBuilderField,
   removeBuilderField,
   renameBuilderField,
@@ -22,6 +25,7 @@ import {
   toGeneratorDocument,
   updateBuilderFieldDefinition,
 } from "./state";
+import { TemplateReferencePicker } from "./template-reference-picker";
 
 const INITIAL_DOCUMENT = {
   schemaVersion: 1,
@@ -171,6 +175,18 @@ export function BuilderShell() {
     else fieldRefs.current.set(fieldId, element);
   }
 
+  function insertTemplateReference(fieldId: string, reference: string) {
+    const field = fields.find((candidate) => candidate.id === fieldId);
+    if (field === undefined) return;
+    const definition = asDefinitionProperties(field.definition);
+    const source =
+      typeof definition.source === "string" ? definition.source : "";
+    configureField(fieldId, {
+      ...definition,
+      source: `${source}{${reference}}`,
+    });
+  }
+
   return (
     <main className="container mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-12">
       <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
@@ -231,6 +247,10 @@ export function BuilderShell() {
                 const editor =
                   typeId === undefined ? undefined : getGeneratorEditor(typeId);
                 const Editor = editor?.Editor;
+                const siblingFields = getBuilderObjectFields(
+                  draft,
+                  field.path.slice(0, -2),
+                );
 
                 return (
                   <li
@@ -381,6 +401,26 @@ export function BuilderShell() {
                             <p className="text-muted-foreground text-sm">
                               This generator has no editable configuration.
                             </p>
+                          )}
+                          {typeId !== "array" ? null : (
+                            <ArrayFieldEditor
+                              definition={asDefinitionProperties(
+                                field.definition,
+                              )}
+                              issues={configurationIssues[field.id] ?? []}
+                              onChange={(properties) =>
+                                configureField(field.id, properties)
+                              }
+                            />
+                          )}
+                          {typeId !== "template" ? null : (
+                            <TemplateReferencePicker
+                              fields={siblingFields}
+                              onInsert={(reference) =>
+                                insertTemplateReference(field.id, reference)
+                              }
+                              templateFieldName={field.name}
+                            />
                           )}
                         </div>
                       </section>
@@ -584,10 +624,19 @@ function asDefinitionProperties(definition: unknown): DefinitionProperties {
 
 function getConfigurationIssues(
   draft: Parameters<typeof toGeneratorDocument>[0],
-  field: { readonly name: string },
+  field: { readonly definition: unknown; readonly name: string },
 ): readonly EditorValidationIssue[] {
   const conversion = toGeneratorDocument(draft);
-  if (conversion.success) return [];
+  if (conversion.success) {
+    if (getGeneratorType(field.definition) !== "template") return [];
+    try {
+      generate(conversion.document.definition);
+      return [];
+    } catch (cause) {
+      const error = asBuilderError(cause);
+      return error === undefined ? [] : [{ message: error.message, path: [] }];
+    }
+  }
   const prefix = ["definition", "fields", field.name];
   return conversion.errors.flatMap((error) => {
     if (!prefix.every((segment, index) => error.path[index] === segment)) {
@@ -595,4 +644,14 @@ function getConfigurationIssues(
     }
     return [{ message: error.message, path: error.path.slice(prefix.length) }];
   });
+}
+
+function asBuilderError(
+  cause: unknown,
+): { readonly message: string } | undefined {
+  return typeof cause === "object" &&
+    cause !== null &&
+    typeof (cause as { readonly message?: unknown }).message === "string"
+    ? { message: (cause as { readonly message: string }).message }
+    : undefined;
 }

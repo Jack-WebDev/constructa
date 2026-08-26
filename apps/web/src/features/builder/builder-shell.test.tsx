@@ -242,6 +242,107 @@ describe("BuilderShell", () => {
     expect(document.activeElement).toBe(matchingFields.at(-1));
   });
 
+  it("edits one generated array's length and item definition", () => {
+    render(<BuilderShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change generator" }));
+    fireEvent.click(screen.getByRole("button", { name: /Array/u }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure" }));
+
+    expect(
+      screen.getByText(
+        "This configures each value in one generated array, not a bulk generation request.",
+      ),
+    ).not.toBeNull();
+    fireEvent.change(screen.getByLabelText("Length"), {
+      target: { value: "0" },
+    });
+    fireEvent.change(screen.getByLabelText("Array item generator"), {
+      target: { value: "uuid" },
+    });
+
+    expect(screen.getByLabelText("Length")).toHaveProperty("value", "0");
+    expect(screen.getByLabelText("Array item generator")).toHaveProperty(
+      "value",
+      "uuid",
+    );
+  });
+
+  it("shows array item validation at the item control", () => {
+    render(<BuilderShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change generator" }));
+    fireEvent.click(screen.getByRole("button", { name: /Array/u }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure" }));
+    fireEvent.change(screen.getByLabelText("Minimum"), {
+      target: { value: "4" },
+    });
+
+    expect(
+      screen.getByText("min must be less than or equal to max"),
+    ).not.toBeNull();
+    expect(screen.getByLabelText("Minimum").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
+  });
+
+  it("inserts sibling references and surfaces template dependency feedback", () => {
+    render(<BuilderShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Change generator" })[1],
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Template/u }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Configure" })[1]);
+    fireEvent.click(screen.getByRole("button", { name: "Insert {field}" }));
+
+    expect(screen.getByLabelText("Template")).toHaveProperty(
+      "value",
+      "Hello {{world}}{field}",
+    );
+    fireEvent.change(screen.getByLabelText("Template"), {
+      target: { value: "{missing}" },
+    });
+    expect(
+      screen.getByText("The referenced object value could not be found."),
+    ).not.toBeNull();
+
+    fireEvent.change(screen.getByLabelText("Template"), {
+      target: { value: "{field2}" },
+    });
+    expect(
+      screen.getByText(/Circular object value reference detected/u),
+    ).not.toBeNull();
+  });
+
+  it("reports non-scalar template references without offering them for insertion", () => {
+    render(<BuilderShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Change generator" })[0],
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Object/u }));
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Change generator" })[1],
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Template/u }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Configure" })[1]);
+
+    expect(screen.queryByRole("button", { name: "Insert {field}" })).toBeNull();
+    fireEvent.change(screen.getByLabelText("Template"), {
+      target: { value: "{field}" },
+    });
+    expect(
+      screen.getByText("Template references must resolve to a scalar value."),
+    ).not.toBeNull();
+  });
+
   it("cancels field removal without changing the field", () => {
     render(<BuilderShell />);
 
