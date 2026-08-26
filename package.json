@@ -19,7 +19,7 @@
     "ci": "pnpm run check && pnpm run check-types && pnpm run test",
     "check:fix": "biome check --write .",
     "lint": "biome check --write .",
-    "test": "vitest run",
+    "test": "pnpm --filter constructa-sdk build && vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "benchmark:core": "node scripts/core-performance-baseline.mjs",
