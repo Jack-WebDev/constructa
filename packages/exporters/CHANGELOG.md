@@ -1,5 +1,11 @@
 # constructa-exporters
 
+## 0.0.5
+
+### Patch Changes
+
+- e8e933d: Verify published package artifacts in a clean npm consumer and use installable semver ranges for internal package dependencies.
+
 ## 0.0.4
 
 ### Patch Changes
