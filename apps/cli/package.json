@@ -1,6 +1,6 @@
 {
   "name": "@constructa/cli",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "description": "The command-line interface for running Constructa generators.",
   "private": true,
   "license": "MIT",
