@@ -1,5 +1,11 @@
 # constructa-schema
 
+## 2.5.0
+
+### Minor Changes
+
+- dcda1d8: Add SDK `generate()` and serialization utilities, plus portable semantic metadata for the built-in generator catalog.
+
 ## 2.4.3
 
 ### Patch Changes
