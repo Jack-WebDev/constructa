@@ -1,16 +1,20 @@
 import { Button } from "@constructa/ui/components/button";
 import { Input } from "@constructa/ui/components/input";
-import { generate } from "constructa-sdk";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { getCatalogEntry, searchGeneratorCatalog } from "../catalog/catalog";
 import type { DefinitionProperties } from "../editor/controls";
-import {
-  type EditorValidationIssue,
-  getGeneratorEditor,
-} from "../editor/registry";
+import { getGeneratorEditor } from "../editor/registry";
 import { ArrayFieldEditor } from "./array-field-editor";
+import {
+  BuilderInlineValidationIssues,
+  BuilderValidationSummary,
+  getDefinitionValidationIssues,
+  validateBuilderDraft,
+} from "./builder-validation";
+import { BuilderDocumentImport } from "./document-import";
 import { BuilderIdentityEditor } from "./identity-editor";
+import { LivePreview } from "./live-preview";
 import { NestedObjectEditor } from "./nested-object-editor";
 import {
   addBuilderField,
@@ -21,8 +25,8 @@ import {
   moveBuilderField,
   removeBuilderField,
   renameBuilderField,
+  replaceBuilderDraftDocument,
   selectBuilderFieldGenerator,
-  toGeneratorDocument,
   updateBuilderFieldDefinition,
 } from "./state";
 import { TemplateReferencePicker } from "./template-reference-picker";
@@ -50,13 +54,11 @@ export function BuilderShell() {
   >();
   const [fieldNames, setFieldNames] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [configurationIssues, setConfigurationIssues] = useState<
-    Record<string, readonly EditorValidationIssue[]>
-  >({});
   const [announcement, setAnnouncement] = useState("");
   const fieldRefs = useRef(new Map<string, HTMLLIElement>());
   const addFieldButtonRef = useRef<HTMLButtonElement>(null);
   const fields = getBuilderFields(draft);
+  const validationIssues = useMemo(() => validateBuilderDraft(draft), [draft]);
 
   useEffect(() => {
     if (focusTarget === undefined) return;
@@ -154,20 +156,12 @@ export function BuilderShell() {
     if (!result.success) return;
 
     setDraft(result.draft);
-    setConfigurationIssues((issues) => ({
-      ...issues,
-      [fieldId]: getConfigurationIssues(result.draft, result.field),
-    }));
   }
 
   function openConfiguration(fieldId: string) {
     const field = fields.find((candidate) => candidate.id === fieldId);
     if (field === undefined) return;
     setFieldToConfigure(fieldId);
-    setConfigurationIssues((issues) => ({
-      ...issues,
-      [fieldId]: getConfigurationIssues(draft, field),
-    }));
   }
 
   function registerFieldRef(fieldId: string, element: HTMLLIElement | null) {
@@ -187,8 +181,23 @@ export function BuilderShell() {
     });
   }
 
+  function importDocument(
+    document: Parameters<typeof replaceBuilderDraftDocument>[1],
+  ) {
+    setDraft((currentDraft) =>
+      replaceBuilderDraftDocument(currentDraft, document),
+    );
+    setFieldToChange(undefined);
+    setFieldToConfigure(undefined);
+    setFieldToRemove(undefined);
+    setPendingGeneratorSelection(undefined);
+    setFieldNames({});
+    setFieldErrors({});
+    setAnnouncement("Generator document imported.");
+  }
+
   return (
-    <main className="container mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-12">
+    <main className="container mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,0.65fr)]">
       <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
         <div className="space-y-2">
           <p className="font-medium text-muted-foreground uppercase tracking-wider">
@@ -202,6 +211,7 @@ export function BuilderShell() {
             needs.
           </p>
         </div>
+        <BuilderDocumentImport onImport={importDocument} />
         <div className="mt-8 border-t pt-6">
           <BuilderIdentityEditor draft={draft} onDraftChange={setDraft} />
         </div>
@@ -251,12 +261,17 @@ export function BuilderShell() {
                   draft,
                   field.path.slice(0, -2),
                 );
+                const fieldIssues = getDefinitionValidationIssues(
+                  validationIssues,
+                  field.path,
+                );
 
                 return (
                   <li
                     aria-label={`Field ${field.name}`}
                     aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
                     className="rounded border bg-muted/30 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    id={`builder-field-${field.id}`}
                     key={field.id}
                     onKeyDown={(event) => {
                       if (event.currentTarget !== event.target || !event.altKey)
@@ -359,6 +374,9 @@ export function BuilderShell() {
                         {fieldErrors[field.id]}
                       </p>
                     )}
+                    {fieldToConfigure === field.id ? null : (
+                      <BuilderInlineValidationIssues issues={fieldIssues} />
+                    )}
                     {fieldToConfigure !== field.id ? null : (
                       <section
                         aria-labelledby={`field-configuration-title-${field.id}`}
@@ -390,7 +408,7 @@ export function BuilderShell() {
                               definition={asDefinitionProperties(
                                 field.definition,
                               )}
-                              issues={configurationIssues[field.id]}
+                              issues={fieldIssues}
                               onChange={(properties) =>
                                 configureField(field.id, properties)
                               }
@@ -407,7 +425,7 @@ export function BuilderShell() {
                               definition={asDefinitionProperties(
                                 field.definition,
                               )}
-                              issues={configurationIssues[field.id] ?? []}
+                              issues={fieldIssues}
                               onChange={(properties) =>
                                 configureField(field.id, properties)
                               }
@@ -583,6 +601,7 @@ export function BuilderShell() {
                         breadcrumbs={[field.name]}
                         depth={1}
                         draft={draft}
+                        validationIssues={validationIssues}
                         objectPath={field.path}
                         onDraftChange={setDraft}
                         onFieldFocus={(id) =>
@@ -599,8 +618,15 @@ export function BuilderShell() {
           <p aria-live="polite" className="sr-only">
             {announcement}
           </p>
+          <BuilderValidationSummary
+            issues={validationIssues}
+            onFocus={(id) => setFocusTarget({ type: "field", id })}
+          />
         </section>
       </section>
+      <aside className="lg:sticky lg:top-6 lg:self-start">
+        <LivePreview draft={draft} />
+      </aside>
     </main>
   );
 }
@@ -620,38 +646,4 @@ function asDefinitionProperties(definition: unknown): DefinitionProperties {
   return typeof definition === "object" && definition !== null
     ? (definition as DefinitionProperties)
     : {};
-}
-
-function getConfigurationIssues(
-  draft: Parameters<typeof toGeneratorDocument>[0],
-  field: { readonly definition: unknown; readonly name: string },
-): readonly EditorValidationIssue[] {
-  const conversion = toGeneratorDocument(draft);
-  if (conversion.success) {
-    if (getGeneratorType(field.definition) !== "template") return [];
-    try {
-      generate(conversion.document.definition);
-      return [];
-    } catch (cause) {
-      const error = asBuilderError(cause);
-      return error === undefined ? [] : [{ message: error.message, path: [] }];
-    }
-  }
-  const prefix = ["definition", "fields", field.name];
-  return conversion.errors.flatMap((error) => {
-    if (!prefix.every((segment, index) => error.path[index] === segment)) {
-      return [];
-    }
-    return [{ message: error.message, path: error.path.slice(prefix.length) }];
-  });
-}
-
-function asBuilderError(
-  cause: unknown,
-): { readonly message: string } | undefined {
-  return typeof cause === "object" &&
-    cause !== null &&
-    typeof (cause as { readonly message?: unknown }).message === "string"
-    ? { message: (cause as { readonly message: string }).message }
-    : undefined;
 }
