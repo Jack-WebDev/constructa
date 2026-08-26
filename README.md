@@ -101,6 +101,10 @@ Boolean ──┘
 > [!NOTE]
 > Constructa is still in early development. The public API shown in this README represents the intended developer experience and may change while the architecture is being finalized.
 
+## Package support
+
+Constructa packages are published to npm and JSR. npm packages support Node.js 22 or later and expose ESM entry points with TypeScript declarations. JSR packages expose the same public APIs for JSR-compatible runtimes. Internal Constructa dependencies use compatible caret ranges; install the SDK alone for the standard developer API, or install lower-level packages only when you need their specific public contracts.
+
 ---
 
 # Why Constructa?
