@@ -9,6 +9,7 @@ import {
   getGeneratorEditor,
 } from "../editor/registry";
 import { BuilderIdentityEditor } from "./identity-editor";
+import { NestedObjectEditor } from "./nested-object-editor";
 import {
   addBuilderField,
   type BuilderFieldMoveDirection,
@@ -165,6 +166,11 @@ export function BuilderShell() {
     }));
   }
 
+  function registerFieldRef(fieldId: string, element: HTMLLIElement | null) {
+    if (element === null) fieldRefs.current.delete(fieldId);
+    else fieldRefs.current.set(fieldId, element);
+  }
+
   return (
     <main className="container mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-12">
       <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
@@ -248,8 +254,7 @@ export function BuilderShell() {
                       }
                     }}
                     ref={(element) => {
-                      if (element === null) fieldRefs.current.delete(field.id);
-                      else fieldRefs.current.set(field.id, element);
+                      registerFieldRef(field.id, element);
                     }}
                     tabIndex={-1}
                   >
@@ -532,6 +537,19 @@ export function BuilderShell() {
                           Remove field
                         </Button>
                       </div>
+                    )}
+                    {typeId !== "object" ? null : (
+                      <NestedObjectEditor
+                        breadcrumbs={[field.name]}
+                        depth={1}
+                        draft={draft}
+                        objectPath={field.path}
+                        onDraftChange={setDraft}
+                        onFieldFocus={(id) =>
+                          setFocusTarget({ type: "field", id })
+                        }
+                        registerFieldRef={registerFieldRef}
+                      />
                     )}
                   </li>
                 );

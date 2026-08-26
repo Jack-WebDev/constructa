@@ -3,15 +3,18 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   addBuilderField,
+  addBuilderObjectField,
   type BuilderDocumentConversion,
   type BuilderDocumentDraft,
   type BuilderFieldDefinitionUpdate,
+  type BuilderFieldDraft,
   type BuilderFieldGeneratorSelection,
   type BuilderFieldMove,
   createBuilderDraft,
   getBuilderDefinitionId,
   getBuilderDocumentIdentity,
   getBuilderFields,
+  getBuilderObjectFields,
   moveBuilderField,
   removeBuilderField,
   renameBuilderField,
@@ -251,6 +254,55 @@ describe("builder document draft state", () => {
       field2: { type: "boolean" },
       field3: { type: "boolean" },
     });
+  });
+
+  it("adds a nested object field with a stable identity and canonical path", () => {
+    const createId = deterministicIds();
+    const draft = createBuilderDraft(
+      {
+        schemaVersion: 1,
+        definition: {
+          type: "object",
+          fields: { profile: { type: "object", fields: {} } },
+        },
+      },
+      { createId },
+    );
+    const objectPath = ["definition", "fields", "profile"] as const;
+    const result = addBuilderObjectField(draft, objectPath, { createId });
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected a nested field");
+    expect(result.field).toEqual({
+      id: "ui-4",
+      name: "field",
+      path: ["definition", "fields", "profile", "fields", "field"],
+      definition: { type: "boolean" },
+    });
+    expect(getBuilderObjectFields(result.draft, objectPath)).toEqual([
+      result.field,
+    ]);
+    expect(toGeneratorDocument(result.draft).success).toBe(true);
+  });
+
+  it("rejects nested field additions outside an object path without mutation", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: { type: "object", fields: { id: { type: "uuid" } } },
+    });
+
+    expect(
+      addBuilderObjectField(draft, ["definition", "fields", "id"]),
+    ).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "Fields can only be added to an object generator.",
+        path: ["definition", "fields", "id"],
+      },
+    });
+    expect(getBuilderFields(draft).map((field) => field.name)).toEqual(["id"]);
   });
 
   it("rejects add-field when the root draft is not an object without mutation", () => {
@@ -729,5 +781,8 @@ describe("builder document draft state", () => {
     expectTypeOf<BuilderFieldDefinitionUpdate>().toMatchTypeOf<{
       readonly success: boolean;
     }>();
+    expectTypeOf(getBuilderObjectFields).returns.toEqualTypeOf<
+      readonly BuilderFieldDraft[]
+    >();
   });
 });

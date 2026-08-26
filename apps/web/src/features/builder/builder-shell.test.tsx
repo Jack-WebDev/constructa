@@ -218,6 +218,30 @@ describe("BuilderShell", () => {
     );
   });
 
+  it("renders nested object fields with breadcrumbs, depth cues, collapse, and focus mapping", () => {
+    render(<BuilderShell />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Add field" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change generator" }));
+    fireEvent.click(screen.getByRole("button", { name: /Object/u }));
+
+    const nestedObject = screen.getByLabelText("Nested object field, depth 1");
+    expect(nestedObject.textContent).toContain("Fields / field");
+    expect(nestedObject.getAttribute("data-depth")).toBe("1");
+    expect(
+      screen.getByRole("listitem", { name: "Field active" }),
+    ).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse field" }));
+    expect(screen.queryByRole("listitem", { name: "Field active" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Expand field" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add field to field" }));
+
+    const matchingFields = screen.getAllByRole("listitem", {
+      name: "Field field",
+    });
+    expect(document.activeElement).toBe(matchingFields.at(-1));
+  });
+
   it("cancels field removal without changing the field", () => {
     render(<BuilderShell />);
 

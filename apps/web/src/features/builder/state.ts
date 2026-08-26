@@ -215,10 +215,18 @@ export function updateBuilderDocumentIdentity(
 export function getBuilderFields(
   draft: BuilderDocumentDraft,
 ): readonly BuilderFieldDraft[] {
-  const fields = getRootObjectFields(draft?.document);
+  return getBuilderObjectFields(draft, ["definition"]);
+}
+
+/** Returns the direct fields for an object definition at a canonical path. */
+export function getBuilderObjectFields(
+  draft: BuilderDocumentDraft,
+  objectPath: ValidationPath,
+): readonly BuilderFieldDraft[] {
+  const fields = getObjectFieldsAtPath(draft?.document, objectPath);
   if (fields === undefined) return [];
   return Object.entries(fields).flatMap(([name, definition]) => {
-    const path = ["definition", "fields", name];
+    const path = [...objectPath, "fields", name];
     const id = getBuilderDefinitionId(draft, path);
     return id === undefined ? [] : [{ definition, id, name, path }];
   });
@@ -267,6 +275,77 @@ export function addBuilderField(
     options,
   );
   const path = ["definition", "fields", name];
+  const id = getBuilderDefinitionId(nextDraft, path);
+  if (id === undefined) {
+    return {
+      success: false,
+      error: {
+        code: "SYSTEM_ERROR",
+        kind: "system",
+        message: "Unable to create a field identity.",
+        path,
+      },
+    };
+  }
+  return {
+    success: true,
+    draft: nextDraft,
+    field: { definition: { type: "boolean" }, id, name, path },
+  };
+}
+
+/** Adds a safe default field to the object definition at the supplied path. */
+export function addBuilderObjectField(
+  draft: BuilderDocumentDraft,
+  objectPath: ValidationPath,
+  options?: CreateBuilderDraftOptions,
+): BuilderFieldAdd {
+  const fields = getObjectFieldsAtPath(draft?.document, objectPath);
+  const document = asRecord(draft?.document);
+  const rootDefinition =
+    document === undefined ? undefined : asRecord(document.definition);
+  if (
+    fields === undefined ||
+    document === undefined ||
+    rootDefinition === undefined
+  ) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "Fields can only be added to an object generator.",
+        path: [...objectPath],
+      },
+    };
+  }
+
+  const name = nextFieldName(fields);
+  const updatedDefinition = replaceDefinitionAtPath(
+    rootDefinition,
+    objectPath,
+    {
+      ...getDefinitionAtPath(document, objectPath),
+      fields: { ...fields, [name]: { type: "boolean" } },
+    },
+  );
+  if (updatedDefinition === undefined) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "Fields can only be added to an object generator.",
+        path: [...objectPath],
+      },
+    };
+  }
+  const nextDraft = replaceBuilderDraftDocument(
+    draft,
+    { ...document, definition: updatedDefinition },
+    options,
+  );
+  const path = [...objectPath, "fields", name];
   const id = getBuilderDefinitionId(nextDraft, path);
   if (id === undefined) {
     return {
@@ -767,6 +846,83 @@ function getRootObjectFields(
       : asRecord(documentRecord.definition);
   if (definition?.type !== "object") return undefined;
   return asRecord(definition.fields);
+}
+
+function getObjectFieldsAtPath(
+  document: unknown,
+  objectPath: ValidationPath,
+): Record<string, unknown> | undefined {
+  const definition = getDefinitionAtPath(document, objectPath);
+  return definition?.type === "object"
+    ? asRecord(definition.fields)
+    : undefined;
+}
+
+function getDefinitionAtPath(
+  document: unknown,
+  path: ValidationPath,
+): Record<string, unknown> | undefined {
+  if (!isDefinitionPath(path)) return undefined;
+  const documentRecord = asRecord(document);
+  let definition =
+    documentRecord === undefined
+      ? undefined
+      : asRecord(documentRecord.definition);
+  for (
+    let index = 1;
+    definition !== undefined && index < path.length;
+    index += 2
+  ) {
+    const fieldName = path[index + 1];
+    const fields =
+      path[index] === "fields" ? asRecord(definition.fields) : undefined;
+    definition =
+      typeof fieldName === "string" && fields !== undefined
+        ? asRecord(fields[fieldName])
+        : undefined;
+  }
+  return definition;
+}
+
+function replaceDefinitionAtPath(
+  definition: Record<string, unknown>,
+  path: ValidationPath,
+  replacement: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (!isDefinitionPath(path)) return undefined;
+  const segments = path.slice(1);
+  const replace = (
+    current: Record<string, unknown>,
+    index: number,
+  ): Record<string, unknown> | undefined => {
+    if (index === segments.length) return replacement;
+    const fieldName = segments[index + 1];
+    const fields =
+      segments[index] === "fields" ? asRecord(current.fields) : undefined;
+    if (typeof fieldName !== "string" || fields === undefined) return undefined;
+    const child = asRecord(fields[fieldName]);
+    if (child === undefined) return undefined;
+    const updatedChild = replace(child, index + 2);
+    return updatedChild === undefined
+      ? undefined
+      : { ...current, fields: { ...fields, [fieldName]: updatedChild } };
+  };
+  return replace(definition, 0);
+}
+
+function isDefinitionPath(path: ValidationPath): boolean {
+  return (
+    Array.isArray(path) &&
+    path[0] === "definition" &&
+    path.length % 2 === 1 &&
+    path.every((segment, index) =>
+      index === 0
+        ? segment === "definition"
+        : index % 2 === 1
+          ? segment === "fields"
+          : typeof segment === "string",
+    )
+  );
 }
 
 function nextFieldName(fields: Record<string, unknown>): string {
