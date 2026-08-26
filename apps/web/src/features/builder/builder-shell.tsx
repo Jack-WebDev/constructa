@@ -204,13 +204,13 @@ export function BuilderShell() {
   }
 
   return (
-    <main className="container mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(19rem,0.65fr)]">
-      <section className="rounded-xl border bg-card p-4 shadow-sm sm:p-6">
+    <main className="mx-auto grid max-w-7xl gap-5 px-4 py-7 sm:px-6 sm:py-10 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.68fr)] lg:gap-7">
+      <section className="rounded-2xl border border-border/80 bg-card/75 p-5 shadow-black/5 shadow-xl sm:p-7">
         <div className="space-y-2">
-          <p className="font-medium text-muted-foreground uppercase tracking-wider">
+          <p className="font-medium text-primary text-xs uppercase tracking-[0.18em]">
             Builder
           </p>
-          <h1 className="font-semibold text-3xl tracking-tight sm:text-4xl">
+          <h1 className="font-semibold text-3xl tracking-[-0.035em] sm:text-4xl">
             Build a generator.
           </h1>
           <p className="text-muted-foreground">
@@ -221,12 +221,12 @@ export function BuilderShell() {
         <BuilderDocumentImport onImport={importDocument} />
         <BuilderDocumentExport draft={draft} />
         <BuilderDraftRecoveryNotice draft={draft} onRestore={restoreDocument} />
-        <div className="mt-8 border-t pt-6">
+        <div className="mt-8 border-border/70 border-t pt-6">
           <BuilderIdentityEditor draft={draft} onDraftChange={setDraft} />
         </div>
         <section
           aria-labelledby="builder-fields-title"
-          className="mt-8 border-t pt-6"
+          className="mt-8 border-border/70 border-t pt-6"
         >
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -238,7 +238,7 @@ export function BuilderShell() {
               </p>
             </div>
             <Button
-              className="h-11 text-sm"
+              className="h-10 rounded-xl text-sm shadow-lg shadow-primary/15"
               onClick={addField}
               ref={addFieldButtonRef}
               type="button"
@@ -247,11 +247,11 @@ export function BuilderShell() {
             </Button>
           </div>
           {fields.length === 0 ? (
-            <p className="mt-4 text-muted-foreground text-sm">
+            <p className="mt-4 rounded-xl border border-border/80 border-dashed bg-muted/30 p-4 text-muted-foreground text-sm">
               No fields yet. Add one to start defining generated data.
             </p>
           ) : (
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-4 space-y-3">
               {fields.map((field, index) => {
                 const typeId = getGeneratorType(field.definition);
                 const catalogEntry =
@@ -279,7 +279,7 @@ export function BuilderShell() {
                   <li
                     aria-label={`Field ${field.name}`}
                     aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-                    className="rounded border bg-muted/30 px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="rounded-xl border border-border/80 bg-background/35 px-3 py-3 text-sm shadow-sm transition-colors hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring sm:px-4"
                     id={`builder-field-${field.id}`}
                     key={field.id}
                     onKeyDown={(event) => {
@@ -302,7 +302,7 @@ export function BuilderShell() {
                     }}
                     tabIndex={-1}
                   >
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Input
                         aria-describedby={
                           fieldErrors[field.id] === undefined
@@ -311,7 +311,7 @@ export function BuilderShell() {
                         }
                         aria-invalid={fieldErrors[field.id] !== undefined}
                         aria-label={`Field name: ${field.name}`}
-                        className="max-w-56 font-medium"
+                        className="h-9 max-w-56 rounded-lg font-medium"
                         onBlur={(event) =>
                           renameField(field.id, event.target.value)
                         }
@@ -324,12 +324,13 @@ export function BuilderShell() {
                         type="text"
                         value={fieldNames[field.id] ?? field.name}
                       />
-                      <span className="text-muted-foreground">
+                      <span className="rounded-md bg-primary/10 px-2 py-1 font-medium text-primary text-xs">
                         {catalogEntry?.displayName ?? "Unknown generator"}
                       </span>
-                      <div className="ml-auto flex gap-1">
+                      <div className="flex w-full gap-1 sm:ml-auto sm:w-auto">
                         <Button
                           onClick={() => setFieldToChange(field.id)}
+                          className="rounded-lg"
                           size="sm"
                           type="button"
                           variant="outline"
@@ -338,6 +339,7 @@ export function BuilderShell() {
                         </Button>
                         <Button
                           onClick={() => openConfiguration(field.id)}
+                          className="rounded-lg"
                           size="sm"
                           type="button"
                           variant="outline"
@@ -348,6 +350,7 @@ export function BuilderShell() {
                           aria-label={`Move ${field.name} up`}
                           disabled={index === 0}
                           onClick={() => moveField(field.id, "up")}
+                          className="rounded-lg"
                           size="sm"
                           type="button"
                           variant="outline"
@@ -358,6 +361,7 @@ export function BuilderShell() {
                           aria-label={`Move ${field.name} down`}
                           disabled={index === fields.length - 1}
                           onClick={() => moveField(field.id, "down")}
+                          className="rounded-lg"
                           size="sm"
                           type="button"
                           variant="outline"
@@ -366,6 +370,7 @@ export function BuilderShell() {
                         </Button>
                         <Button
                           onClick={() => setFieldToRemove(field.id)}
+                          className="rounded-lg"
                           size="sm"
                           type="button"
                           variant="destructive"
@@ -633,7 +638,7 @@ export function BuilderShell() {
           />
         </section>
       </section>
-      <aside className="lg:sticky lg:top-6 lg:self-start">
+      <aside className="lg:sticky lg:top-24 lg:self-start">
         <LivePreview draft={draft} />
       </aside>
     </main>

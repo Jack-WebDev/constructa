@@ -45,12 +45,12 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
 
 function RootDocument() {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <head>
         <HeadContent />
       </head>
       <body>
-        <div className="grid h-svh grid-rows-[auto_1fr]">
+        <div className="grid min-h-svh grid-rows-[auto_1fr] pb-24 md:pb-0">
           <Header />
           <Outlet />
         </div>

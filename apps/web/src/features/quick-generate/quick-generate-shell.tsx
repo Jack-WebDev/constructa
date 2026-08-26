@@ -1,4 +1,6 @@
+import { Badge } from "@constructa/ui/components/badge";
 import { Button } from "@constructa/ui/components/button";
+import { Card, CardContent, CardHeader } from "@constructa/ui/components/card";
 import { Label } from "@constructa/ui/components/label";
 import {
   BUILT_IN_GENERATOR_CATALOG,
@@ -10,6 +12,7 @@ import {
   integer,
   string,
 } from "constructa-sdk";
+import { Play, Sparkles, WandSparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { DefinitionProperties } from "../editor/controls";
@@ -92,87 +95,108 @@ export function QuickGenerateShell() {
   const Editor = editor?.Editor;
 
   return (
-    <main className="container mx-auto grid max-w-5xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8 lg:py-12">
-      <section
+    <main className="mx-auto grid max-w-6xl gap-5 px-4 py-7 sm:px-6 sm:py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8 lg:py-12">
+      <Card
         aria-labelledby="quick-generate-title"
-        className="rounded-xl border bg-card p-4 shadow-sm sm:p-6"
+        className="rounded-2xl border-border/80 bg-card/75 py-0 shadow-black/5 shadow-xl"
       >
-        <div className="space-y-2">
-          <p className="font-medium text-muted-foreground uppercase tracking-wider">
-            Quick Generate
-          </p>
-          <h1
-            className="font-semibold text-3xl tracking-tight sm:text-4xl"
-            id="quick-generate-title"
+        <CardHeader className="border-border/70 border-b px-5 py-5 sm:px-6">
+          <Badge
+            className="w-fit rounded-full border-primary/20 bg-primary/10 px-2.5 text-primary"
+            variant="outline"
           >
-            Generate one value.
-          </h1>
-          <p className="text-muted-foreground" id="quick-generate-description">
-            Choose a generator, adjust its definition, and run it through the
-            shared engine.
-          </p>
-        </div>
-
-        <form
-          aria-describedby="quick-generate-description"
-          aria-labelledby="quick-generate-title"
-          className="mt-6 space-y-6"
-          onSubmit={(event) => {
-            event.preventDefault();
-            generateValue();
-          }}
-          ref={configurationRef}
-        >
-          <div className="grid gap-1.5">
-            <Label htmlFor="generator-type">Generator</Label>
-            <select
-              className="h-11 w-full rounded border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/80 dark:bg-input/30"
-              id="generator-type"
-              onChange={(event) => selectGenerator(event.target.value)}
-              value={typeId}
+            <Sparkles className="size-3" /> Quick generate
+          </Badge>
+          <div className="mt-3 space-y-2">
+            <h1
+              className="font-semibold text-3xl tracking-[-0.035em] sm:text-4xl"
+              id="quick-generate-title"
             >
-              {BUILT_IN_GENERATOR_CATALOG.map((entry) => (
-                <option key={entry.typeId} value={entry.typeId}>
-                  {entry.displayName}
-                </option>
-              ))}
-            </select>
+              Generate one value.
+            </h1>
+            <p
+              className="text-muted-foreground text-sm leading-6"
+              id="quick-generate-description"
+            >
+              Choose a generator, adjust its definition, and run it through the
+              shared engine.
+            </p>
           </div>
+        </CardHeader>
 
-          <section aria-labelledby="configuration-title" className="space-y-3">
-            <h2 className="font-medium text-lg" id="configuration-title">
-              Configuration
-            </h2>
-            {Editor === undefined ? (
-              <p role="alert">The selected generator is not available.</p>
-            ) : (
-              <Editor
-                definition={definition}
-                issues={issues}
-                onChange={updateDefinition}
-              />
-            )}
-            <DefinitionErrorSummary issues={issues} />
-            {hasEditableProperties(definition) ? null : (
-              <p className="text-muted-foreground text-sm">
-                This generator has no editable configuration.
-              </p>
-            )}
-          </section>
-          <div className="sticky bottom-0 z-10 -mx-4 mt-6 border-t bg-card/95 px-4 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:backdrop-blur-none">
-            <Button className="h-11 w-full text-sm lg:w-auto" type="submit">
-              Generate
-            </Button>
-          </div>
-        </form>
-      </section>
+        <CardContent className="p-5 sm:p-6">
+          <form
+            aria-describedby="quick-generate-description"
+            aria-labelledby="quick-generate-title"
+            className="space-y-6"
+            onSubmit={(event) => {
+              event.preventDefault();
+              generateValue();
+            }}
+            ref={configurationRef}
+          >
+            <div className="grid gap-1.5">
+              <Label htmlFor="generator-type">Generator</Label>
+              <select
+                className="h-11 w-full rounded-xl border border-input bg-background/40 px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/80 dark:bg-input/30"
+                id="generator-type"
+                onChange={(event) => selectGenerator(event.target.value)}
+                value={typeId}
+              >
+                {BUILT_IN_GENERATOR_CATALOG.map((entry) => (
+                  <option key={entry.typeId} value={entry.typeId}>
+                    {entry.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <section
+              aria-labelledby="configuration-title"
+              className="space-y-3"
+            >
+              <h2 className="font-medium text-base" id="configuration-title">
+                Configuration
+              </h2>
+              {Editor === undefined ? (
+                <p role="alert">The selected generator is not available.</p>
+              ) : (
+                <Editor
+                  definition={definition}
+                  issues={issues}
+                  onChange={updateDefinition}
+                />
+              )}
+              <DefinitionErrorSummary issues={issues} />
+              {hasEditableProperties(definition) ? null : (
+                <p className="text-muted-foreground text-sm">
+                  This generator has no editable configuration.
+                </p>
+              )}
+            </section>
+            <div className="sticky bottom-0 z-10 -mx-5 mt-6 border-border/70 border-t bg-card/95 px-5 py-3 backdrop-blur-sm sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:border-0 lg:bg-transparent lg:px-0 lg:pb-0 lg:backdrop-blur-none">
+              <Button
+                className="h-11 w-full rounded-xl text-sm shadow-lg shadow-primary/15 lg:w-auto"
+                type="submit"
+              >
+                <Play className="size-4" /> Generate
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       <aside
         aria-label="Generation result"
-        className="lg:sticky lg:top-6 lg:self-start"
+        className="lg:sticky lg:top-24 lg:self-start"
         ref={resultRef}
       >
         <ResultPreview state={generation} />
+        <div className="mt-4 hidden rounded-2xl border border-border/70 bg-muted/35 p-4 text-muted-foreground text-sm leading-6 lg:block">
+          <WandSparkles className="mb-2 size-4 text-primary" />
+          Pick a generator to see only the controls that matter, then run it
+          instantly.
+        </div>
       </aside>
     </main>
   );
