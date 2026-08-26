@@ -23,6 +23,17 @@ export const MAX_STRING_LENGTH = 10_000;
 /** The largest supported generated-array length. */
 export const MAX_ARRAY_LENGTH = 10_000;
 
+/** Semantic catalog information for one built-in generator. */
+export type BuiltInGeneratorCatalogEntry = {
+  readonly typeId: string;
+  readonly displayName: string;
+  readonly description: string;
+  readonly category: string;
+  readonly tags: readonly string[];
+  readonly outputCategory: string;
+  readonly examples: readonly GeneratorDefinition[];
+};
+
 const STRING_CHARSETS = {
   alphabetic: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
   numeric: "0123456789",
@@ -878,3 +889,104 @@ function invalidRange(
 ): ValidationIssue {
   return { code: "invalid_range", path, message };
 }
+
+/**
+ * Portable semantic metadata for the built-in catalog. UI controls and icons
+ * intentionally remain owned by application-level registries.
+ */
+export const BUILT_IN_GENERATOR_CATALOG = Object.freeze([
+  {
+    typeId: "array",
+    displayName: "Array",
+    description: "Generates a fixed-length array from one child generator.",
+    category: "composition",
+    tags: ["list", "collection", "repeated"] as const,
+    outputCategory: "array",
+    examples: [array(integer({ min: 1, max: 3 }), { length: 3 })],
+  },
+  {
+    typeId: "boolean",
+    displayName: "Boolean",
+    description: "Generates true or false with equal probability.",
+    category: "primitive",
+    tags: ["true", "false", "flag"] as const,
+    outputCategory: "boolean",
+    examples: [boolean()],
+  },
+  {
+    typeId: "choice",
+    displayName: "Choice",
+    description: "Selects one value from a non-empty list of JSON values.",
+    category: "primitive",
+    tags: ["enum", "selection", "literal"] as const,
+    outputCategory: "json",
+    examples: [choice(["small", "medium", "large"])],
+  },
+  {
+    typeId: "date",
+    displayName: "Date",
+    description: "Generates an inclusive ISO calendar date within a range.",
+    category: "primitive",
+    tags: ["calendar", "iso-date", "time"] as const,
+    outputCategory: "string",
+    examples: [date({ min: "2026-01-01", max: "2026-12-31" })],
+  },
+  {
+    typeId: "decimal",
+    displayName: "Decimal",
+    description: "Generates a bounded decimal number at a chosen precision.",
+    category: "numeric",
+    tags: ["number", "fraction", "precision"] as const,
+    outputCategory: "number",
+    examples: [decimal({ min: 0, max: 100, precision: 2 })],
+  },
+  {
+    typeId: "integer",
+    displayName: "Integer",
+    description: "Generates an inclusive whole number within a range.",
+    category: "numeric",
+    tags: ["number", "whole-number", "range"] as const,
+    outputCategory: "number",
+    examples: [integer({ min: 1, max: 100 })],
+  },
+  {
+    typeId: "object",
+    displayName: "Object",
+    description: "Generates an object from named child generators.",
+    category: "composition",
+    tags: ["record", "fields", "composite"] as const,
+    outputCategory: "object",
+    examples: [
+      object({ active: boolean(), score: integer({ min: 0, max: 10 }) }),
+    ],
+  },
+  {
+    typeId: "string",
+    displayName: "String",
+    description:
+      "Generates a string from a predefined or custom character set.",
+    category: "primitive",
+    tags: ["text", "characters", "charset"] as const,
+    outputCategory: "string",
+    examples: [string({ length: 12, charset: "alphanumeric" })],
+  },
+  {
+    typeId: "template",
+    displayName: "Template",
+    description:
+      "Builds text from literal content and object-local references.",
+    category: "composition",
+    tags: ["interpolation", "references", "text"] as const,
+    outputCategory: "string",
+    examples: [template("Hello {{world}}")],
+  },
+  {
+    typeId: "uuid",
+    displayName: "UUID",
+    description: "Generates an RFC 4122 version 4 UUID.",
+    category: "primitive",
+    tags: ["identifier", "v4", "random"] as const,
+    outputCategory: "string",
+    examples: [uuid()],
+  },
+] as const satisfies readonly BuiltInGeneratorCatalogEntry[]);

@@ -1,14 +1,66 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
+  array,
+  boolean,
+  choice,
   createEngine,
   createRegistry,
+  date,
+  decimal,
   defineGenerator,
   type Engine,
+  generate,
   type Infer,
   integer,
   object,
+  serializeDefinition,
+  string,
+  template,
+  uuid,
 } from "./index";
+
+describe("canonical SDK API", () => {
+  it("generates the PRD employee example without infrastructure setup", () => {
+    const employee = object({
+      id: uuid(),
+      active: boolean(),
+      role: choice(["engineer", "designer"]),
+      score: decimal({ min: 0, max: 100, precision: 2 }),
+      startDate: date({ min: "2024-01-01", max: "2024-12-31" }),
+      code: string({ length: 6 }),
+      labels: array(choice(["new", "verified"]), { length: 2 }),
+      summary: template("Employee"),
+    });
+
+    expectTypeOf<Infer<typeof employee>>().toEqualTypeOf<{
+      readonly id: string;
+      readonly active: boolean;
+      readonly role: "engineer" | "designer";
+      readonly score: number;
+      readonly startDate: string;
+      readonly code: string;
+      readonly labels: ("new" | "verified")[];
+      readonly summary: string;
+    }>();
+    expect(generate(employee, { seed: "employee" })).toEqual(
+      generate(employee, { seed: "employee" }),
+    );
+  });
+
+  it("executes serialized definitions through the same built-in engine", () => {
+    const definition = object({
+      role: choice(["admin", "member"]),
+      number: integer({ min: 1, max: 100 }),
+    });
+    const serialized = serializeDefinition(definition);
+    const reparsed = JSON.parse(serialized);
+
+    expect(generate(reparsed, { seed: "portable" })).toEqual(
+      generate(definition, { seed: "portable" }),
+    );
+  });
+});
 
 describe("createEngine", () => {
   it("automatically registers every built-in generator", () => {
@@ -49,6 +101,7 @@ describe("createEngine", () => {
     });
 
     expect(engine.generate({ type: "custom" })).toBe("custom result");
+    expect(generate(integer({ min: 2, max: 2 }))).toBe(2);
     expect(
       createEngine({
         random: {

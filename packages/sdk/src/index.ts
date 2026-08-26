@@ -32,6 +32,7 @@ import { ConstructaError, type ConstructaErrorCode } from "constructa-schema";
 
 export * from "constructa-core";
 export * from "constructa-generators";
+export { serializeDefinition, serializeDocument } from "constructa-schema";
 
 /** Options for an advanced SDK engine instance. */
 export type CreateEngineOptions = {
@@ -61,6 +62,16 @@ const ENGINE_ERROR_CODES = {
 
 type EngineErrorCode =
   (typeof ENGINE_ERROR_CODES)[keyof typeof ENGINE_ERROR_CODES];
+
+const defaultEngine = createEngine();
+
+/** Generates one value through the isolated SDK built-in engine. */
+export function generate<Definition extends GeneratorDefinition>(
+  definition: Definition,
+  options?: ExecutionOptions,
+): import("constructa-schema").Infer<Definition> {
+  return defaultEngine.generate(definition, options);
+}
 
 /**
  * Creates an isolated engine with all built-in generators registered.

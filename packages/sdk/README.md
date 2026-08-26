@@ -21,6 +21,22 @@ const age = engine.generate(integer({ min: 18, max: 65 }), {
 });
 ```
 
+For ordinary one-off generation, use the package-level `generate()` function:
+
+```ts
+import { choice, generate } from "jsr:@constructa/sdk";
+
+const role = generate(choice(["admin", "member"]), { seed: "example" });
+// "admin" | "member"
+```
+
+`Infer<typeof definition>` captures a factory definition's generated value
+type. It preserves `choice()` literals and recursively maps `object()` and
+`array()` definitions. `parseDefinition`, `parseDocument`,
+`serializeDefinition`, and `serializeDocument` are available as developer
+utilities; `createRegistry`, `createExecutor`, `createEngine`, and
+`defineGenerator` remain advanced APIs.
+
 `createEngine({ registry?, random?, limits? })` is available for advanced
 customization. A supplied registry replaces the built-in registry and is
 snapshotted when the engine is created; later registry mutations do not affect

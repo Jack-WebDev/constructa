@@ -237,6 +237,7 @@ describe("semantic generator metadata", () => {
     displayName: "Integer",
     description: "Generates a whole number.",
     category: "numeric",
+    tags: ["whole-number", "range"],
     outputCategory: "number",
     documentationUrl: "https://constructa.dev/generators/integer",
     examples: [0, 42, { min: 1, max: 10 }],
@@ -259,6 +260,8 @@ describe("semantic generator metadata", () => {
   it.each([
     [{ typeId: "Integer" }, "metadata_type_id_invalid", ["typeId"]],
     [{ category: "two words" }, "metadata_category_invalid", ["category"]],
+    [{ tags: "numeric" }, "metadata_tags_invalid", ["tags"]],
+    [{ tags: ["numeric", "numeric"] }, "metadata_tags_duplicate", ["tags", 1]],
     [
       { outputCategory: "preview value" },
       "metadata_output_category_invalid",
