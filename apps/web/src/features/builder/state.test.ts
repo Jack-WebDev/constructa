@@ -1,13 +1,21 @@
+import { generate } from "constructa-sdk";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import {
   addBuilderField,
   type BuilderDocumentConversion,
   type BuilderDocumentDraft,
+  type BuilderFieldGeneratorSelection,
+  type BuilderFieldMove,
   createBuilderDraft,
   getBuilderDefinitionId,
   getBuilderDocumentIdentity,
+  getBuilderFields,
+  moveBuilderField,
+  removeBuilderField,
+  renameBuilderField,
   replaceBuilderDraftDocument,
+  selectBuilderFieldGenerator,
   toGeneratorDocument,
   updateBuilderDocumentIdentity,
 } from "./state";
@@ -262,6 +270,336 @@ describe("builder document draft state", () => {
     expect(toGeneratorDocument(draft).success).toBe(true);
   });
 
+  it("removes a field by UI identity without changing remaining identities", () => {
+    const draft = createBuilderDraft(
+      {
+        schemaVersion: 1,
+        definition: {
+          type: "object",
+          fields: { id: { type: "uuid" }, active: { type: "boolean" } },
+        },
+      },
+      { createId: deterministicIds() },
+    );
+    const active = getBuilderFields(draft).find(
+      (field) => field.name === "active",
+    );
+    if (active === undefined) throw new Error("Expected an active field");
+    const result = removeBuilderField(draft, active.id);
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected the field to be removed");
+    expect(result.field).toEqual(active);
+    expect(getBuilderFields(result.draft)).toEqual([
+      expect.objectContaining({ name: "id" }),
+    ]);
+    expect(
+      getBuilderDefinitionId(result.draft, ["definition", "fields", "id"]),
+    ).toBe(getBuilderDefinitionId(draft, ["definition", "fields", "id"]));
+  });
+
+  it("rejects removal of a missing field without mutation", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: { type: "object", fields: {} },
+    });
+
+    expect(removeBuilderField(draft, "missing")).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "The field to remove no longer exists.",
+        path: ["definition", "fields"],
+      },
+    });
+    expect(getBuilderFields(draft)).toEqual([]);
+  });
+
+  it("renames a field and updates its nested paths without changing identities", () => {
+    const draft = createBuilderDraft(
+      {
+        schemaVersion: 1,
+        definition: {
+          type: "object",
+          fields: {
+            account: { type: "object", fields: { id: { type: "uuid" } } },
+          },
+        },
+      },
+      { createId: deterministicIds() },
+    );
+    const account = getBuilderFields(draft)[0];
+    const accountId = account.id;
+    const nestedId = getBuilderDefinitionId(draft, [
+      "definition",
+      "fields",
+      "account",
+      "fields",
+      "id",
+    ]);
+    const result = renameBuilderField(draft, account.id, "profile");
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected the field to be renamed");
+    expect(result.field).toMatchObject({ id: accountId, name: "profile" });
+    expect(
+      getBuilderDefinitionId(result.draft, [
+        "definition",
+        "fields",
+        "profile",
+        "fields",
+        "id",
+      ]),
+    ).toBe(nestedId);
+    expect(toGeneratorDocument(result.draft).success).toBe(true);
+  });
+
+  it.each([
+    ["", "Field names cannot be empty."],
+    ["   ", "Field names cannot be empty."],
+    ["id", "Field names must be unique."],
+    ["__proto__", "This field name is not allowed."],
+    ["constructor", "This field name is not allowed."],
+    ["prototype", "This field name is not allowed."],
+  ])("rejects invalid field name %j without mutation", (name, message) => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: {
+        type: "object",
+        fields: { id: { type: "uuid" }, active: { type: "boolean" } },
+      },
+    });
+    const active = getBuilderFields(draft).find(
+      (field) => field.name === "active",
+    );
+    if (active === undefined) throw new Error("Expected an active field");
+
+    expect(renameBuilderField(draft, active.id, name)).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message,
+        path: ["definition", "fields", "active"],
+      },
+    });
+    expect(getBuilderFields(draft).map((field) => field.name)).toEqual([
+      "id",
+      "active",
+    ]);
+  });
+
+  it("moves fields while preserving definitions, paths, and UI identities", () => {
+    const draft = createBuilderDraft(
+      {
+        schemaVersion: 1,
+        definition: {
+          type: "object",
+          fields: {
+            first: { type: "uuid" },
+            second: { type: "boolean" },
+            third: { type: "integer", min: 1, max: 1 },
+          },
+        },
+      },
+      { createId: deterministicIds() },
+    );
+    const second = getBuilderFields(draft)[1];
+    const result = moveBuilderField(draft, second.id, "up");
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected the field to move");
+    expect(getBuilderFields(result.draft).map((field) => field.name)).toEqual([
+      "second",
+      "first",
+      "third",
+    ]);
+    expect(result.field).toEqual(second);
+    expect(
+      getBuilderDefinitionId(result.draft, ["definition", "fields", "second"]),
+    ).toBe(second.id);
+    expect(result.draft.document).toEqual({
+      schemaVersion: 1,
+      definition: {
+        type: "object",
+        fields: {
+          second: { type: "boolean" },
+          first: { type: "uuid" },
+          third: { type: "integer", min: 1, max: 1 },
+        },
+      },
+    });
+  });
+
+  it("keeps reference resolution and dependency scheduling invariant after a move", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: {
+        type: "object",
+        fields: {
+          greeting: { type: "template", source: "Hello {name}" },
+          name: { type: "choice", values: ["Ada"] },
+        },
+      },
+    });
+    const greeting = getBuilderFields(draft)[0];
+    const result = moveBuilderField(draft, greeting.id, "down");
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected the field to move");
+    const conversion = toGeneratorDocument(result.draft);
+    expect(conversion.success).toBe(true);
+    if (!conversion.success) throw new Error("Expected a valid document");
+    const generated = generate(conversion.document.definition, {
+      seed: "field-reorder",
+    });
+    expect(generated).toEqual({ name: "Ada", greeting: "Hello Ada" });
+    if (typeof generated !== "object" || generated === null)
+      throw new Error("Expected object output");
+    expect(Object.keys(generated)).toEqual(["name", "greeting"]);
+  });
+
+  it.each([
+    ["up", "The field is already first.", ["definition", "fields", "first"]],
+    ["down", "The field is already last.", ["definition", "fields", "second"]],
+  ] as const)(
+    "rejects a boundary move %s without mutation",
+    (direction, message, path) => {
+      const draft = createBuilderDraft({
+        schemaVersion: 1,
+        definition: {
+          type: "object",
+          fields: { first: { type: "boolean" }, second: { type: "boolean" } },
+        },
+      });
+      const field = getBuilderFields(draft)[direction === "up" ? 0 : 1];
+
+      expect(moveBuilderField(draft, field.id, direction)).toEqual({
+        success: false,
+        error: {
+          code: "INVALID_CONFIGURATION",
+          kind: "configuration",
+          message,
+          path,
+        },
+      });
+      expect(
+        getBuilderFields(draft).map((candidate) => candidate.name),
+      ).toEqual(["first", "second"]);
+    },
+  );
+
+  it("rejects moving a stale field without mutation", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: { type: "object", fields: { first: { type: "boolean" } } },
+    });
+
+    expect(moveBuilderField(draft, "missing", "up")).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "The field to move no longer exists.",
+        path: ["definition", "fields"],
+      },
+    });
+  });
+
+  it("rejects an invalid move direction without mutation", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: { type: "object", fields: { first: { type: "boolean" } } },
+    });
+    const field = getBuilderFields(draft)[0];
+
+    expect(moveBuilderField(draft, field.id, "sideways" as "up")).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "A field move direction must be up or down.",
+        path: ["definition", "fields"],
+      },
+    });
+  });
+
+  it("replaces a field with an allowlisted generator and discards old configuration", () => {
+    const draft = createBuilderDraft(
+      {
+        schemaVersion: 1,
+        definition: {
+          type: "object",
+          fields: { age: { type: "integer", min: 18, max: 65 } },
+        },
+      },
+      { createId: deterministicIds() },
+    );
+    const age = getBuilderFields(draft)[0];
+    const result = selectBuilderFieldGenerator(draft, age.id, "uuid");
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("Expected the generator to change");
+    expect(result.field).toEqual({
+      id: age.id,
+      name: "age",
+      path: ["definition", "fields", "age"],
+      definition: { type: "uuid" },
+    });
+    expect(toGeneratorDocument(result.draft).success).toBe(true);
+  });
+
+  it("rejects an unavailable field generator without mutation", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: { type: "object", fields: { age: { type: "boolean" } } },
+    });
+    const age = getBuilderFields(draft)[0];
+
+    expect(selectBuilderFieldGenerator(draft, age.id, "missing")).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "The selected generator is not available.",
+        path: ["definition", "fields", "age", "type"],
+      },
+    });
+    expect(getBuilderFields(draft)[0]).toEqual(age);
+  });
+
+  it("keeps compatible configuration when the selected generator is unchanged", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: {
+        type: "object",
+        fields: { age: { type: "integer", min: 18, max: 65 } },
+      },
+    });
+    const age = getBuilderFields(draft)[0];
+    const result = selectBuilderFieldGenerator(draft, age.id, "integer");
+
+    expect(result).toEqual({ success: true, draft, field: age });
+  });
+
+  it("rejects selecting a generator for a stale field", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: { type: "object", fields: {} },
+    });
+
+    expect(selectBuilderFieldGenerator(draft, "missing", "uuid")).toEqual({
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "The field to update no longer exists.",
+        path: ["definition", "fields"],
+      },
+    });
+  });
+
   it("rejects identity changes when the draft does not contain a document object", () => {
     const result = updateBuilderDocumentIdentity(createBuilderDraft(null), {
       name: "Employee",
@@ -296,6 +634,12 @@ describe("builder document draft state", () => {
   it("keeps the draft and conversion type surfaces explicit", () => {
     expectTypeOf<BuilderDocumentDraft["document"]>().toEqualTypeOf<unknown>();
     expectTypeOf<BuilderDocumentConversion>().toMatchTypeOf<{
+      readonly success: boolean;
+    }>();
+    expectTypeOf<BuilderFieldMove>().toMatchTypeOf<{
+      readonly success: boolean;
+    }>();
+    expectTypeOf<BuilderFieldGeneratorSelection>().toMatchTypeOf<{
       readonly success: boolean;
     }>();
   });
