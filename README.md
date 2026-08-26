@@ -613,6 +613,12 @@ Object
 
 The goal is for moving between **TypeScript, JSON, and the visual Builder** to feel like working with the same system.
 
+The web editor maps each built-in generator type to accessible, web-owned controls. Those controls update the same flat portable properties used by the TypeScript factories; final validation and execution still run through the shared Constructa engine.
+
+Quick Generate is available at `/quick-generate` for an anonymous, one-off run. It uses the same portable definition and shared engine as every other Constructa surface.
+
+Browse built-in generators at `/generators`. The catalog has normalized search across names, descriptions, and tags, category filters, and stable detail URLs such as `/generators/integer`.
+
 ---
 
 # What can you build?
