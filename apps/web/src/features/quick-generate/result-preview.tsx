@@ -30,14 +30,14 @@ export function ResultPreview({
   return (
     <section
       aria-labelledby="result-title"
-      className="scroll-mt-4 rounded-2xl border border-border/80 bg-card/75 p-5 shadow-black/5 shadow-xl sm:p-6"
+      className="app-surface scroll-mt-4 rounded-2xl p-5 sm:p-6"
     >
       <h2 className="font-medium text-lg" id="result-title">
         Result
       </h2>
       {state.status === "idle" ? (
         <p className="mt-3 text-muted-foreground text-sm">
-          Configure a generator, then select Generate.
+          Choose a generator, set its options, then generate a value.
         </p>
       ) : null}
       {state.status === "loading" ? (
@@ -112,7 +112,7 @@ function SuccessPreview({
       <output
         aria-label="Generated result"
         aria-live="polite"
-        className="mt-3 block max-h-[50dvh] overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-muted/60 p-3 font-mono text-sm sm:max-h-96"
+        className="result-reveal mt-3 block max-h-[50dvh] overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-muted/60 p-3 font-mono text-sm sm:max-h-96"
       >
         {visiblePreview}
       </output>
