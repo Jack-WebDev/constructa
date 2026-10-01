@@ -1,7 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { createBuilderDraft } from "../../builder/state";
 import {
   type EditorProps,
   getBuiltInEditorRegistry,
@@ -74,58 +73,10 @@ describe("web editor registry", () => {
     });
   });
 
-  it("owns the child presentation selected by each composite type", () => {
-    for (const typeId of ["array", "object", "template"] as const) {
-      const registration = getGeneratorEditor(typeId);
-      expect(registration?.CompositeEditor).toBeDefined();
+  it("keeps recursive builder behavior out of registrations", () => {
+    for (const registration of WEB_EDITOR_REGISTRY) {
+      expect(registration).not.toHaveProperty("CompositeEditor");
     }
-  });
-
-  it("renders and updates an array item through its registered composite editor", () => {
-    const registration = getGeneratorEditor("array");
-    const CompositeEditor = registration?.CompositeEditor;
-    const onDraftChange = vi.fn();
-    const renderDefinitionConfiguration = vi.fn(() => (
-      <p>Nested array item configuration</p>
-    ));
-    const draft = createBuilderDraft({
-      schemaVersion: 1,
-      definition: {
-        type: "object",
-        fields: {
-          records: {
-            type: "array",
-            item: { type: "boolean" },
-            length: 2,
-          },
-        },
-      },
-    });
-
-    expect(CompositeEditor).toBeDefined();
-    if (CompositeEditor === undefined)
-      throw new Error("Array must own a composite editor");
-
-    render(
-      <CompositeEditor
-        breadcrumbs={[]}
-        definition={{ type: "array", item: { type: "boolean" }, length: 2 }}
-        draft={draft}
-        fieldName="records"
-        onDefinitionChange={() => undefined}
-        onDraftChange={onDraftChange}
-        path={["definition", "fields", "records"]}
-        renderDefinitionConfiguration={renderDefinitionConfiguration}
-        renderObjectFields={() => null}
-        validationIssues={[]}
-      />,
-    );
-
-    expect(screen.getByText("Nested array item configuration")).not.toBeNull();
-    fireEvent.change(screen.getByLabelText("Array item generator"), {
-      target: { value: "uuid" },
-    });
-    expect(onDraftChange).toHaveBeenCalledOnce();
   });
 
   it("keeps the public editor props typed around flat definition properties", () => {

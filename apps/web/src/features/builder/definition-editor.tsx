@@ -1,13 +1,14 @@
 import { Button } from "@constructa/ui/components/button";
 import { Input } from "@constructa/ui/components/input";
-import { BUILT_IN_GENERATOR_CATALOG } from "constructa-sdk";
+import { Label } from "@constructa/ui/components/label";
+import {
+  BUILT_IN_GENERATOR_CATALOG,
+  type ValidationPath,
+} from "constructa-sdk";
 import { type RefObject, useState } from "react";
 
 import type { DefinitionProperties } from "../editor/controls";
-import {
-  type CompositeEditorProps,
-  getGeneratorEditor,
-} from "../editor/registry";
+import { getGeneratorEditor } from "../editor/registry";
 import {
   BuilderInlineValidationIssues,
   type BuilderValidationIssue,
@@ -19,13 +20,16 @@ import {
   type BuilderFieldDraft,
   type BuilderFieldMoveDirection,
   type BuilderUiId,
+  getBuilderDefinition,
   getBuilderObjectFields,
   moveBuilderField,
   removeBuilderField,
   renameBuilderField,
+  selectBuilderDefinitionGenerator,
   selectBuilderFieldGenerator,
   updateBuilderDefinition,
 } from "./state";
+import { TemplateReferencePicker } from "./template-reference-picker";
 
 type DefinitionEditorProps = {
   readonly draft: BuilderDocumentDraft;
@@ -53,7 +57,7 @@ export function DefinitionEditor(props: DefinitionEditorProps) {
 
 type ObjectFieldsProps = DefinitionEditorProps & {
   readonly breadcrumbs: readonly string[];
-  readonly objectPath: readonly (string | number)[];
+  readonly objectPath: ValidationPath;
 };
 
 function ObjectFields({
@@ -532,7 +536,7 @@ type DefinitionConfigurationProps = Pick<
   readonly draft: BuilderDocumentDraft;
   readonly fieldName: string;
   readonly onClose: () => void;
-  readonly path: readonly (string | number)[];
+  readonly path: ValidationPath;
   readonly validationIssues: readonly BuilderValidationIssue[];
 };
 
@@ -554,54 +558,12 @@ function DefinitionConfiguration({
   const registration =
     typeId === undefined ? undefined : getGeneratorEditor(typeId);
   const Editor = registration?.Editor;
-  const CompositeEditor = registration?.CompositeEditor;
+  const templateParentPath =
+    typeId === "template" ? getTemplateParentPath(path) : undefined;
 
   function update(properties: DefinitionProperties) {
     const result = updateBuilderDefinition(draft, path, properties);
     if (result.success) onDraftChange(result.draft);
-  }
-
-  function renderDefinitionConfiguration(
-    childDefinition: DefinitionProperties,
-    childFieldName: string,
-    childPath: CompositeEditorProps["path"],
-    childValidationIssues: CompositeEditorProps["validationIssues"],
-  ) {
-    return (
-      <DefinitionConfiguration
-        addFieldButtonRef={addFieldButtonRef}
-        breadcrumbs={breadcrumbs}
-        definition={childDefinition}
-        draft={draft}
-        fieldName={childFieldName}
-        onClose={() => undefined}
-        onDraftChange={onDraftChange}
-        onEmptyFocus={onEmptyFocus}
-        onFieldFocus={onFieldFocus}
-        path={childPath}
-        registerFieldRef={registerFieldRef}
-        validationIssues={childValidationIssues}
-      />
-    );
-  }
-
-  function renderObjectFields(
-    childBreadcrumbs: readonly string[],
-    objectPath: CompositeEditorProps["path"],
-  ) {
-    return (
-      <ObjectFields
-        addFieldButtonRef={addFieldButtonRef}
-        breadcrumbs={childBreadcrumbs}
-        draft={draft}
-        objectPath={objectPath}
-        onDraftChange={onDraftChange}
-        onEmptyFocus={onEmptyFocus}
-        onFieldFocus={onFieldFocus}
-        registerFieldRef={registerFieldRef}
-        validationIssues={validationIssues}
-      />
-    );
   }
 
   return (
@@ -625,23 +587,136 @@ function DefinitionConfiguration({
             onChange={update}
           />
         )}
-        {CompositeEditor === undefined ? null : (
-          <CompositeEditor
+        {typeId === "array" ? (
+          <ArrayDefinitionEditor
+            addFieldButtonRef={addFieldButtonRef}
             breadcrumbs={breadcrumbs}
-            definition={definition}
             draft={draft}
-            fieldName={fieldName}
-            onDefinitionChange={update}
             onDraftChange={onDraftChange}
+            onEmptyFocus={onEmptyFocus}
+            onFieldFocus={onFieldFocus}
             path={path}
-            renderDefinitionConfiguration={renderDefinitionConfiguration}
-            renderObjectFields={renderObjectFields}
+            registerFieldRef={registerFieldRef}
             validationIssues={validationIssues}
           />
-        )}
+        ) : null}
+        {typeId === "object" ? (
+          <ObjectFields
+            addFieldButtonRef={addFieldButtonRef}
+            breadcrumbs={[...breadcrumbs, fieldName]}
+            draft={draft}
+            objectPath={path}
+            onDraftChange={onDraftChange}
+            onEmptyFocus={onEmptyFocus}
+            onFieldFocus={onFieldFocus}
+            registerFieldRef={registerFieldRef}
+            validationIssues={validationIssues}
+          />
+        ) : null}
+        {typeId === "template" && templateParentPath !== undefined ? (
+          <TemplateReferencePicker
+            fields={getBuilderObjectFields(draft, templateParentPath)}
+            onInsert={(reference) =>
+              update({
+                ...definition,
+                source: `${typeof definition.source === "string" ? definition.source : ""}{${reference}}`,
+              })
+            }
+            templateFieldName={fieldName}
+          />
+        ) : null}
       </div>
     </section>
   );
+}
+
+type ArrayDefinitionEditorProps = Pick<
+  DefinitionConfigurationProps,
+  | "addFieldButtonRef"
+  | "breadcrumbs"
+  | "draft"
+  | "onDraftChange"
+  | "onEmptyFocus"
+  | "onFieldFocus"
+  | "registerFieldRef"
+> & {
+  readonly path: ValidationPath;
+  readonly validationIssues: readonly BuilderValidationIssue[];
+};
+
+function ArrayDefinitionEditor({
+  addFieldButtonRef,
+  breadcrumbs,
+  draft,
+  onDraftChange,
+  onEmptyFocus,
+  onFieldFocus,
+  path,
+  registerFieldRef,
+  validationIssues,
+}: ArrayDefinitionEditorProps) {
+  const itemPath = [...path, "item"];
+  const item = getBuilderDefinition(draft, itemPath);
+  const itemType = getGeneratorType(item);
+  const itemIssues = getDefinitionValidationIssues(validationIssues, ["item"]);
+  if (item === undefined)
+    return (
+      <p className="mt-3" role="alert">
+        The array item generator is not available.
+      </p>
+    );
+
+  function selectItemGenerator(typeId: string) {
+    const result = selectBuilderDefinitionGenerator(draft, itemPath, typeId);
+    if (result.success) onDraftChange(result.draft);
+  }
+
+  return (
+    <section aria-labelledby="array-item-title" className="mt-4 border-t pt-4">
+      <h4 className="font-medium" id="array-item-title">
+        Array item
+      </h4>
+      <p className="mt-1 text-muted-foreground text-sm">
+        This configures each value in one generated array, not a bulk generation
+        request.
+      </p>
+      <div className="mt-3 grid gap-1.5">
+        <Label htmlFor="array-item-generator">Array item generator</Label>
+        <select
+          className="h-11 w-full rounded border border-input bg-transparent px-3 text-sm"
+          id="array-item-generator"
+          onChange={(event) => selectItemGenerator(event.target.value)}
+          value={itemType ?? ""}
+        >
+          {BUILT_IN_GENERATOR_CATALOG.map((entry) => (
+            <option key={entry.typeId} value={entry.typeId}>
+              {entry.displayName}
+            </option>
+          ))}
+        </select>
+      </div>
+      <DefinitionConfiguration
+        addFieldButtonRef={addFieldButtonRef}
+        breadcrumbs={breadcrumbs}
+        definition={item}
+        draft={draft}
+        fieldName="array item"
+        onClose={() => undefined}
+        onDraftChange={onDraftChange}
+        onEmptyFocus={onEmptyFocus}
+        onFieldFocus={onFieldFocus}
+        path={itemPath}
+        registerFieldRef={registerFieldRef}
+        validationIssues={itemIssues}
+      />
+    </section>
+  );
+}
+
+function getTemplateParentPath(
+  path: ValidationPath,
+): ValidationPath | undefined {
+  return path.at(-1) === "item" ? undefined : path.slice(0, -2);
 }
 
 function getGeneratorType(definition: unknown): string | undefined {

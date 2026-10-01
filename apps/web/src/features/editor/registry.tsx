@@ -1,18 +1,6 @@
-import { Label } from "@constructa/ui/components/label";
-import {
-  BUILT_IN_GENERATOR_CATALOG,
-  type ValidationPath,
-} from "constructa-sdk";
-import type { ComponentType, ReactNode } from "react";
+import { BUILT_IN_GENERATOR_CATALOG } from "constructa-sdk";
+import type { ComponentType } from "react";
 
-import type { BuilderValidationIssue } from "../builder/builder-validation";
-import {
-  type BuilderDocumentDraft,
-  getBuilderDefinition,
-  getBuilderObjectFields,
-  selectBuilderDefinitionGenerator,
-} from "../builder/state";
-import { TemplateReferencePicker } from "../builder/template-reference-picker";
 import {
   getFieldIssue,
   type WebFieldIssue,
@@ -37,37 +25,9 @@ export type EditorProps = {
 
 export type EditorValidationIssue = WebFieldIssue;
 
-/**
- * Context for a composite generator editor. The registry owns which type uses
- * nested definitions, object fields, or template references. The builder
- * supplies the recursive renderers and remains the sole owner of draft state.
- */
-export type CompositeEditorProps = {
-  readonly breadcrumbs: readonly string[];
-  readonly definition: DefinitionProperties;
-  readonly draft: BuilderDocumentDraft;
-  readonly fieldName: string;
-  readonly onDefinitionChange: (definition: DefinitionProperties) => void;
-  readonly onDraftChange: (draft: BuilderDocumentDraft) => void;
-  readonly path: ValidationPath;
-  readonly renderDefinitionConfiguration: (
-    definition: DefinitionProperties,
-    fieldName: string,
-    path: ValidationPath,
-    validationIssues: readonly BuilderValidationIssue[],
-  ) => ReactNode;
-  readonly renderObjectFields: (
-    breadcrumbs: readonly string[],
-    objectPath: ValidationPath,
-  ) => ReactNode;
-  readonly validationIssues: readonly BuilderValidationIssue[];
-};
-
 export type GeneratorEditorRegistration = {
   readonly typeId: string;
   readonly Editor: ComponentType<EditorProps>;
-  /** Renders the type-specific child-definition presentation, when needed. */
-  readonly CompositeEditor?: ComponentType<CompositeEditorProps>;
 };
 
 const charsetOptions = [
@@ -83,27 +43,15 @@ const charsetOptions = [
  */
 export const WEB_EDITOR_REGISTRY: readonly GeneratorEditorRegistration[] =
   Object.freeze([
-    {
-      typeId: "array",
-      Editor: ArrayEditor,
-      CompositeEditor: ArrayCompositeEditor,
-    },
+    { typeId: "array", Editor: ArrayEditor },
     { typeId: "boolean", Editor: EmptyEditor },
     { typeId: "choice", Editor: ChoiceEditor },
     { typeId: "date", Editor: DateEditor },
     { typeId: "decimal", Editor: DecimalEditor },
     { typeId: "integer", Editor: IntegerEditor },
-    {
-      typeId: "object",
-      Editor: EmptyEditor,
-      CompositeEditor: ObjectCompositeEditor,
-    },
+    { typeId: "object", Editor: EmptyEditor },
     { typeId: "string", Editor: StringEditor },
-    {
-      typeId: "template",
-      Editor: TemplateEditor,
-      CompositeEditor: TemplateCompositeEditor,
-    },
+    { typeId: "template", Editor: TemplateEditor },
     { typeId: "uuid", Editor: EmptyEditor },
   ] satisfies readonly GeneratorEditorRegistration[]);
 
@@ -311,93 +259,6 @@ function ArrayEditor({ definition, disabled, issues, onChange }: EditorProps) {
   );
 }
 
-function ArrayCompositeEditor({
-  draft,
-  onDraftChange,
-  path,
-  renderDefinitionConfiguration,
-  validationIssues,
-}: CompositeEditorProps) {
-  const itemPath = [...path, "item"];
-  const item = getBuilderDefinition(draft, itemPath);
-  const itemType = getDefinitionType(item);
-  const itemIssues = validationIssues.flatMap((issue) =>
-    issue.path[0] === "item" ? [{ ...issue, path: issue.path.slice(1) }] : [],
-  );
-  if (item === undefined)
-    return (
-      <p className="mt-3" role="alert">
-        The array item generator is not available.
-      </p>
-    );
-
-  function selectItemGenerator(typeId: string) {
-    const result = selectBuilderDefinitionGenerator(draft, itemPath, typeId);
-    if (result.success) onDraftChange(result.draft);
-  }
-
-  return (
-    <section aria-labelledby="array-item-title" className="mt-4 border-t pt-4">
-      <h4 className="font-medium" id="array-item-title">
-        Array item
-      </h4>
-      <p className="mt-1 text-muted-foreground text-sm">
-        This configures each value in one generated array, not a bulk generation
-        request.
-      </p>
-      <div className="mt-3 grid gap-1.5">
-        <Label htmlFor="array-item-generator">Array item generator</Label>
-        <select
-          className="h-11 w-full rounded border border-input bg-transparent px-3 text-sm"
-          id="array-item-generator"
-          onChange={(event) => selectItemGenerator(event.target.value)}
-          value={itemType ?? ""}
-        >
-          {BUILT_IN_GENERATOR_CATALOG.map((entry) => (
-            <option key={entry.typeId} value={entry.typeId}>
-              {entry.displayName}
-            </option>
-          ))}
-        </select>
-      </div>
-      {renderDefinitionConfiguration(item, "array item", itemPath, itemIssues)}
-    </section>
-  );
-}
-
-function ObjectCompositeEditor({
-  breadcrumbs,
-  fieldName,
-  path,
-  renderObjectFields,
-}: CompositeEditorProps) {
-  return renderObjectFields([...breadcrumbs, fieldName], path);
-}
-
-function TemplateCompositeEditor({
-  definition,
-  draft,
-  fieldName,
-  onDefinitionChange,
-  path,
-}: CompositeEditorProps) {
-  const parentPath = path.at(-1) === "item" ? undefined : path.slice(0, -2);
-  if (parentPath === undefined) return null;
-
-  return (
-    <TemplateReferencePicker
-      fields={getBuilderObjectFields(draft, parentPath)}
-      onInsert={(reference) =>
-        onDefinitionChange({
-          ...definition,
-          source: `${typeof definition.source === "string" ? definition.source : ""}{${reference}}`,
-        })
-      }
-      templateFieldName={fieldName}
-    />
-  );
-}
-
 function EmptyEditor() {
   return null;
 }
@@ -418,10 +279,4 @@ function controlProps(
     onChange: (value: unknown) => onChange({ ...definition, [name]: value }),
     value: definition[name],
   };
-}
-
-function getDefinitionType(
-  definition: Readonly<Record<string, unknown>> | undefined,
-): string | undefined {
-  return typeof definition?.type === "string" ? definition.type : undefined;
 }
