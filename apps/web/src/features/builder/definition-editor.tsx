@@ -15,6 +15,10 @@ import {
   getDefinitionValidationIssues,
 } from "./builder-validation";
 import {
+  getArrayItemDefinitionPath,
+  getParentObjectDefinitionPath,
+} from "./definition-path";
+import {
   addBuilderObjectField,
   type BuilderDocumentDraft,
   type BuilderFieldDraft,
@@ -378,7 +382,7 @@ function FieldRow({
           draft={draft}
           fieldName={field.name}
           path={field.path}
-          validationIssues={fieldIssues}
+          validationIssues={validationIssues}
           onDraftChange={onDraftChange}
           onEmptyFocus={onEmptyFocus}
           onClose={() => setConfigurationOpen(false)}
@@ -559,7 +563,11 @@ function DefinitionConfiguration({
     typeId === undefined ? undefined : getGeneratorEditor(typeId);
   const Editor = registration?.Editor;
   const templateParentPath =
-    typeId === "template" ? getTemplateParentPath(path) : undefined;
+    typeId === "template" ? getParentObjectDefinitionPath(path) : undefined;
+  const definitionIssues = getDefinitionValidationIssues(
+    validationIssues,
+    path,
+  );
 
   function update(properties: DefinitionProperties) {
     const result = updateBuilderDefinition(draft, path, properties);
@@ -583,7 +591,7 @@ function DefinitionConfiguration({
         ) : (
           <Editor
             definition={definition}
-            issues={validationIssues}
+            issues={definitionIssues}
             onChange={update}
           />
         )}
@@ -655,10 +663,9 @@ function ArrayDefinitionEditor({
   registerFieldRef,
   validationIssues,
 }: ArrayDefinitionEditorProps) {
-  const itemPath = [...path, "item"];
+  const itemPath = getArrayItemDefinitionPath(path);
   const item = getBuilderDefinition(draft, itemPath);
   const itemType = getGeneratorType(item);
-  const itemIssues = getDefinitionValidationIssues(validationIssues, ["item"]);
   if (item === undefined)
     return (
       <p className="mt-3" role="alert">
@@ -707,16 +714,10 @@ function ArrayDefinitionEditor({
         onFieldFocus={onFieldFocus}
         path={itemPath}
         registerFieldRef={registerFieldRef}
-        validationIssues={itemIssues}
+        validationIssues={validationIssues}
       />
     </section>
   );
-}
-
-function getTemplateParentPath(
-  path: ValidationPath,
-): ValidationPath | undefined {
-  return path.at(-1) === "item" ? undefined : path.slice(0, -2);
 }
 
 function getGeneratorType(definition: unknown): string | undefined {
