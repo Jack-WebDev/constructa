@@ -204,8 +204,8 @@ export function BuilderShell() {
   }
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-5 px-4 py-7 sm:px-6 sm:py-10 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.68fr)] lg:gap-7">
-      <section className="rounded-2xl border border-border/80 bg-card/75 p-5 shadow-black/5 shadow-xl sm:p-7">
+    <main className="app-page mx-auto grid max-w-7xl gap-5 px-4 py-7 sm:px-6 sm:py-10 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.68fr)] lg:gap-7">
+      <section className="app-surface rounded-2xl p-5 sm:p-7">
         <div className="space-y-2">
           <p className="font-medium text-primary text-xs uppercase tracking-[0.18em]">
             Builder
@@ -214,8 +214,8 @@ export function BuilderShell() {
             Build a generator.
           </h1>
           <p className="text-muted-foreground">
-            Start with document details, then add the fields your generated data
-            needs.
+            Name your generator, add fields, and use the preview to check your
+            work as you go.
           </p>
         </div>
         <BuilderDocumentImport onImport={importDocument} />
@@ -234,7 +234,7 @@ export function BuilderShell() {
                 Fields
               </h2>
               <p className="text-muted-foreground text-sm">
-                Add fields to the generator object.
+                Add the fields your generated object should contain.
               </p>
             </div>
             <Button
@@ -279,7 +279,7 @@ export function BuilderShell() {
                   <li
                     aria-label={`Field ${field.name}`}
                     aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
-                    className="rounded-xl border border-border/80 bg-background/35 px-3 py-3 text-sm shadow-sm transition-colors hover:border-primary/30 focus-visible:ring-2 focus-visible:ring-ring sm:px-4"
+                    className="rounded-xl border border-border/80 bg-background/35 px-3 py-3 text-sm shadow-sm transition-[border-color,box-shadow,background-color] hover:border-primary/30 hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring sm:px-4"
                     id={`builder-field-${field.id}`}
                     key={field.id}
                     onKeyDown={(event) => {

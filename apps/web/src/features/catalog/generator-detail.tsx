@@ -36,14 +36,14 @@ export function GeneratorDetail({ typeId }: { readonly typeId: string }) {
   );
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+    <main className="app-page mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
       <a
         className="inline-flex items-center gap-1 text-muted-foreground text-sm transition-colors hover:text-primary"
         href="/generators"
       >
         <ArrowLeft className="size-4" /> Generator library
       </a>
-      <section className="mt-5 rounded-2xl border border-border/80 bg-card/70 p-6 shadow-black/5 shadow-xl sm:p-8">
+      <section className="app-surface mt-5 rounded-2xl p-6 sm:p-8">
         <Badge className="rounded-full capitalize" variant="secondary">
           {entry.category}
         </Badge>
@@ -60,13 +60,13 @@ export function GeneratorDetail({ typeId }: { readonly typeId: string }) {
             className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl bg-primary px-3 font-medium text-primary-foreground text-xs shadow-lg shadow-primary/15 transition-transform hover:-translate-y-0.5 hover:bg-primary/80"
             href="/quick-generate"
           >
-            Try it <ArrowRight className="size-4" />
+            Generate a sample <ArrowRight className="size-4" />
           </a>
         </div>
       </section>
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
-        <Card className="rounded-2xl border-border/80 bg-card/70 py-0 shadow-black/5 shadow-lg">
+        <Card className="app-surface rounded-2xl py-0">
           <CardHeader className="border-border/70 border-b px-5 py-4">
             <h2
               className="flex items-center gap-2 font-medium text-base"
@@ -82,7 +82,7 @@ export function GeneratorDetail({ typeId }: { readonly typeId: string }) {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-border/80 bg-card/70 py-0 shadow-black/5 shadow-lg">
+        <Card className="app-surface rounded-2xl py-0">
           <CardHeader className="border-border/70 border-b px-5 py-4">
             <h2
               className="flex items-center gap-2 font-medium text-base"
@@ -115,7 +115,7 @@ export function GeneratorDetail({ typeId }: { readonly typeId: string }) {
         </Card>
       </div>
 
-      <Card className="mt-5 rounded-2xl border-border/80 bg-card/70 py-0 shadow-black/5 shadow-lg">
+      <Card className="app-surface mt-5 rounded-2xl py-0">
         <CardHeader className="border-border/70 border-b px-5 py-4">
           <h2 className="font-medium text-base" id="examples-title">
             Examples

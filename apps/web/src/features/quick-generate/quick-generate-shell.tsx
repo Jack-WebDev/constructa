@@ -95,10 +95,10 @@ export function QuickGenerateShell() {
   const Editor = editor?.Editor;
 
   return (
-    <main className="mx-auto grid max-w-6xl gap-5 px-4 py-7 sm:px-6 sm:py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8 lg:py-12">
+    <main className="app-page mx-auto grid max-w-6xl gap-5 px-4 py-7 sm:px-6 sm:py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8 lg:py-12">
       <Card
         aria-labelledby="quick-generate-title"
-        className="rounded-2xl border-border/80 bg-card/75 py-0 shadow-black/5 shadow-xl"
+        className="app-surface rounded-2xl py-0"
       >
         <CardHeader className="border-border/70 border-b px-5 py-5 sm:px-6">
           <Badge
@@ -118,8 +118,7 @@ export function QuickGenerateShell() {
               className="text-muted-foreground text-sm leading-6"
               id="quick-generate-description"
             >
-              Choose a generator, adjust its definition, and run it through the
-              shared engine.
+              Choose what you need, set the options, and generate a sample.
             </p>
           </div>
         </CardHeader>
@@ -194,8 +193,8 @@ export function QuickGenerateShell() {
         <ResultPreview state={generation} />
         <div className="mt-4 hidden rounded-2xl border border-border/70 bg-muted/35 p-4 text-muted-foreground text-sm leading-6 lg:block">
           <WandSparkles className="mb-2 size-4 text-primary" />
-          Pick a generator to see only the controls that matter, then run it
-          instantly.
+          Only the options for your selected generator appear here. Generate a
+          value whenever you are ready.
         </div>
       </aside>
     </main>
