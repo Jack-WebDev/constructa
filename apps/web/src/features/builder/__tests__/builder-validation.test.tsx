@@ -7,7 +7,6 @@ import {
   getDefinitionValidationIssues,
   validateBuilderDraft,
 } from "../builder-validation";
-import { NestedObjectEditor } from "../nested-object-editor";
 import { createBuilderDraft } from "../state";
 
 describe("validateBuilderDraft", () => {
@@ -61,22 +60,6 @@ describe("validateBuilderDraft", () => {
     expect(getDefinitionValidationIssues(issues, agePath)).toEqual(
       expect.arrayContaining([expect.objectContaining({ path: ["min"] })]),
     );
-
-    render(
-      <NestedObjectEditor
-        breadcrumbs={["profile"]}
-        depth={1}
-        draft={draft}
-        objectPath={["definition", "fields", "profile"]}
-        onDraftChange={vi.fn()}
-        onFieldFocus={vi.fn()}
-        registerFieldRef={vi.fn()}
-        validationIssues={issues}
-      />,
-    );
-    expect(
-      screen.getByText(/min: min must be less than or equal to max/u),
-    ).not.toBeNull();
   });
 
   it("renders accessible focus links for canonical issues", () => {

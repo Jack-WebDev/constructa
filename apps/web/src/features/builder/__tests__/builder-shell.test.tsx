@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, expectTypeOf, it } from "vitest";
 
 import { BuilderShell } from "../builder-shell";
@@ -340,10 +346,18 @@ describe("BuilderShell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add field" }));
     fireEvent.click(screen.getByRole("button", { name: "Add field" }));
     fireEvent.click(
-      screen.getAllByRole("button", { name: "Change generator" })[1],
+      within(screen.getByRole("listitem", { name: "Field field2" })).getByRole(
+        "button",
+        { name: "Change generator" },
+      ),
     );
     fireEvent.click(screen.getByRole("button", { name: /Template/u }));
-    fireEvent.click(screen.getAllByRole("button", { name: "Configure" })[1]);
+    fireEvent.click(
+      within(screen.getByRole("listitem", { name: "Field field2" })).getByRole(
+        "button",
+        { name: "Configure" },
+      ),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Insert {field}" }));
 
     expect(screen.getByLabelText("Template")).toHaveProperty(
@@ -375,10 +389,18 @@ describe("BuilderShell", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: /Object/u }));
     fireEvent.click(
-      screen.getAllByRole("button", { name: "Change generator" })[1],
+      within(screen.getByRole("listitem", { name: "Field field2" })).getByRole(
+        "button",
+        { name: "Change generator" },
+      ),
     );
     fireEvent.click(screen.getByRole("button", { name: /Template/u }));
-    fireEvent.click(screen.getAllByRole("button", { name: "Configure" })[1]);
+    fireEvent.click(
+      within(screen.getByRole("listitem", { name: "Field field2" })).getByRole(
+        "button",
+        { name: "Configure" },
+      ),
+    );
 
     expect(screen.queryByRole("button", { name: "Insert {field}" })).toBeNull();
     fireEvent.change(screen.getByLabelText("Template"), {

@@ -1,5 +1,6 @@
 import { type GeneratorDefinition, generate } from "constructa-sdk";
 
+import { getRelativeDefinitionIssuePath } from "./definition-path";
 import type {
   BuilderDocumentDraft,
   BuilderDraftError,
@@ -34,13 +35,15 @@ export function validateBuilderDraft(
 /** Returns issues beneath a definition with paths relative to that definition. */
 export function getDefinitionValidationIssues(
   issues: readonly BuilderValidationIssue[],
-  definitionPath: readonly (string | number)[],
+  definitionPath: BuilderDraftError["path"],
 ): readonly BuilderValidationIssue[] {
-  return issues.flatMap((issue) =>
-    hasPathPrefix(issue.path, definitionPath)
-      ? [{ ...issue, path: issue.path.slice(definitionPath.length) }]
-      : [],
-  );
+  return issues.flatMap((issue) => {
+    const relativePath = getRelativeDefinitionIssuePath(
+      issue.path,
+      definitionPath,
+    );
+    return relativePath === undefined ? [] : [{ ...issue, path: relativePath }];
+  });
 }
 
 /** Renders the document-wide validation summary and focus links. */
@@ -188,13 +191,6 @@ function findOwningFieldId(
     if (id !== undefined) return id;
   }
   return undefined;
-}
-
-function hasPathPrefix(
-  path: readonly (string | number)[],
-  prefix: readonly (string | number)[],
-): boolean {
-  return prefix.every((segment, index) => path[index] === segment);
 }
 
 function formatPath(path: readonly (string | number)[]): string {

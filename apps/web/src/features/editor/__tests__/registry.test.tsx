@@ -73,6 +73,12 @@ describe("web editor registry", () => {
     });
   });
 
+  it("keeps recursive builder behavior out of registrations", () => {
+    for (const registration of WEB_EDITOR_REGISTRY) {
+      expect(registration).not.toHaveProperty("CompositeEditor");
+    }
+  });
+
   it("keeps the public editor props typed around flat definition properties", () => {
     expectTypeOf<EditorProps["definition"]>().toEqualTypeOf<
       Readonly<Record<string, unknown>>

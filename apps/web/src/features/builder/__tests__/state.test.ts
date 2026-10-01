@@ -11,6 +11,7 @@ import {
   type BuilderFieldGeneratorSelection,
   type BuilderFieldMove,
   createBuilderDraft,
+  getBuilderDefinition,
   getBuilderDefinitionId,
   getBuilderDocumentIdentity,
   getBuilderFields,
@@ -19,8 +20,10 @@ import {
   removeBuilderField,
   renameBuilderField,
   replaceBuilderDraftDocument,
+  selectBuilderDefinitionGenerator,
   selectBuilderFieldGenerator,
   toGeneratorDocument,
+  updateBuilderDefinition,
   updateBuilderDocumentIdentity,
   updateBuilderFieldDefinition,
 } from "../state";
@@ -34,6 +37,47 @@ function deterministicIds(): () => string {
 }
 
 describe("builder document draft state", () => {
+  it("edits a nested array item through the shared recursive definition path", () => {
+    const draft = createBuilderDraft({
+      schemaVersion: 1,
+      definition: {
+        type: "object",
+        fields: {
+          records: {
+            type: "array",
+            item: { type: "object", fields: { active: { type: "boolean" } } },
+            length: 2,
+          },
+        },
+      },
+    });
+    const itemPath = ["definition", "fields", "records", "item"] as const;
+    const changed = selectBuilderDefinitionGenerator(
+      draft,
+      itemPath,
+      "integer",
+    );
+
+    expect(changed.success).toBe(true);
+    if (!changed.success)
+      throw new Error("Expected array item generator to change");
+    const configured = updateBuilderDefinition(changed.draft, itemPath, {
+      type: "integer",
+      min: 4,
+      max: 9,
+    });
+
+    expect(configured.success).toBe(true);
+    if (!configured.success)
+      throw new Error("Expected array item to configure");
+    expect(getBuilderDefinition(configured.draft, itemPath)).toEqual({
+      type: "integer",
+      min: 4,
+      max: 9,
+    });
+    expect(toGeneratorDocument(configured.draft).success).toBe(true);
+  });
+
   it("assigns stable UI-only identities to the root and nested definitions", () => {
     const draft = createBuilderDraft(
       {

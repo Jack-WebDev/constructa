@@ -37,7 +37,9 @@ describe("ResultPreview", () => {
   it("renders empty, loading, error, and overflow states", () => {
     const { rerender } = render(<ResultPreview state={{ status: "idle" }} />);
     expect(
-      screen.getByText("Configure a generator, then select Generate."),
+      screen.getByText(
+        "Choose a generator, set its options, then generate a value.",
+      ),
     ).not.toBeNull();
 
     rerender(<ResultPreview state={{ status: "loading" }} />);
