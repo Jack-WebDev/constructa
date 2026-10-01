@@ -68,7 +68,7 @@ const FEATURES = [
     icon: Blocks,
     title: "Compose visually",
     description:
-      "Assemble primitives into the exact data shape your product needs.",
+      "Start with a blank generator and add only the fields you need.",
     action: "Open builder",
     href: "/builder",
   },
@@ -76,7 +76,7 @@ const FEATURES = [
     icon: Braces,
     title: "Portable by design",
     description:
-      "Keep one readable definition for the web app, SDK, API, and CLI.",
+      "Choose a built-in generator, understand its options, and reuse it anywhere.",
     action: "Browse generators",
     href: "/generators",
   },
@@ -84,7 +84,7 @@ const FEATURES = [
     icon: Layers3,
     title: "Ready to reuse",
     description:
-      "Turn repeatable fixtures and test data into a shared building block.",
+      "Generate a sample value before you add it to a larger definition.",
     action: "Browse generators",
     href: "/generators",
   },
@@ -101,7 +101,7 @@ const CAPABILITIES = [
 
 export function Homepage() {
   return (
-    <main className="min-h-screen overflow-hidden bg-background text-foreground">
+    <main className="app-page min-h-screen overflow-hidden bg-background text-foreground">
       <section
         aria-labelledby="homepage-title"
         className="relative border-border border-b"
@@ -148,8 +148,8 @@ export function Homepage() {
               </h1>
 
               <p className="mt-7 max-w-lg text-base text-muted-foreground leading-7 sm:text-lg sm:leading-8">
-                Constructa is a composable workspace for designing generator
-                definitions and producing dependable data on demand.
+                Build reusable generators for fixtures, test data, and product
+                workflows—then produce dependable data whenever you need it.
               </p>
             </div>
 
@@ -176,9 +176,9 @@ export function Homepage() {
 
             <div className="mt-9 flex flex-wrap gap-x-7 gap-y-3 text-muted-foreground text-xs">
               {[
-                "No setup required",
-                "JSON-first definitions",
-                "Built-in validation",
+                "Start with built-in generators",
+                "Keep definitions portable",
+                "Catch invalid settings early",
               ].map((item) => (
                 <span key={item} className="flex items-center gap-2">
                   <span className="grid size-4 place-items-center rounded-full border border-success/70">
@@ -215,7 +215,7 @@ export function Homepage() {
               ({ action, description, href, icon: Icon, title }) => (
                 <Card
                   key={title}
-                  className="group rounded-2xl border border-border bg-card/85 py-0 shadow-foreground/5 shadow-lg transition duration-300 hover:-translate-y-1 hover:shadow-foreground/10 hover:shadow-xl"
+                  className="app-interactive-card group rounded-2xl border border-border bg-card/85 py-0 shadow-foreground/5 shadow-lg"
                 >
                   <CardHeader className="p-6">
                     <span className="mb-5 grid size-12 place-items-center rounded-full bg-accent text-accent-foreground">

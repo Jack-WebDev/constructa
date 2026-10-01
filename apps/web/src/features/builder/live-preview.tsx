@@ -79,7 +79,7 @@ export function LivePreview({
   return (
     <section
       aria-labelledby="live-preview-title"
-      className="rounded-2xl border border-border/80 bg-card/75 p-5 shadow-black/5 shadow-xl sm:p-6"
+      className="app-surface rounded-2xl p-5 sm:p-6"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -87,7 +87,7 @@ export function LivePreview({
             Live preview
           </h2>
           <p className="text-muted-foreground text-sm">
-            Updates after you pause editing.
+            Updates shortly after you stop editing.
           </p>
         </div>
         <Button
@@ -128,7 +128,7 @@ export function LivePreview({
         <output
           aria-label="Live preview result"
           aria-live="polite"
-          className="mt-4 block max-h-96 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-muted/60 p-3 font-mono text-sm"
+          className="result-reveal mt-4 block max-h-96 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-muted/60 p-3 font-mono text-sm"
         >
           {formatPreview(state.value)}
         </output>
