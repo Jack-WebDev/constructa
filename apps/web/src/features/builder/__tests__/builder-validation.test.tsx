@@ -80,7 +80,7 @@ describe("validateBuilderDraft", () => {
     );
 
     const link = screen.getByRole("link", {
-      name: "definition.fields.age.min: min must be less than or equal to max",
+      name: "Review field: min must be less than or equal to max",
     });
     link.click();
     expect(onFocus).toHaveBeenCalledWith("age-field");

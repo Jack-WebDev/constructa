@@ -1,6 +1,7 @@
 import { Button } from "@constructa/ui/components/button";
 import { Input } from "@constructa/ui/components/input";
 import { type GeneratorDefinition, generate } from "constructa-sdk";
+import { RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { describeWebError, type WebError } from "../errors/error-presentation";
@@ -77,44 +78,50 @@ export function LivePreview({
   }, [requestPreview]);
 
   return (
-    <section
-      aria-labelledby="live-preview-title"
-      className="app-surface rounded-2xl p-5 sm:p-6"
-    >
+    <section aria-labelledby="live-preview-title" className="min-h-full">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-medium text-lg" id="live-preview-title">
+          <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-[0.14em]">
             Live preview
+          </p>
+          <h2 className="mt-1 font-medium text-base" id="live-preview-title">
+            Result
           </h2>
           <p className="text-muted-foreground text-sm">
             Updates shortly after you stop editing.
           </p>
         </div>
         <Button
+          aria-label="Regenerate"
           onClick={() => requestPreview()}
           type="button"
           className="rounded-lg"
           variant="outline"
         >
-          Regenerate
+          <RefreshCw /> New sample
         </Button>
       </div>
-      <div className="mt-4 grid gap-1.5">
-        <label className="font-medium text-sm" htmlFor="preview-seed">
-          Preview seed (optional)
-        </label>
-        <Input
-          id="preview-seed"
-          onChange={(event) => setSeed(event.target.value)}
-          placeholder="Leave blank for a fresh sample"
-          type="text"
-          value={seed}
-        />
-        <p className="text-muted-foreground text-xs">
-          The seed is used only for this preview and is not saved in the
-          generator document.
-        </p>
-      </div>
+      <details className="mt-5 border-border/70 border-t pt-4">
+        <summary className="cursor-pointer font-medium text-muted-foreground text-sm marker:text-muted-foreground">
+          Preview options
+        </summary>
+        <div className="mt-3 grid gap-1.5">
+          <label className="font-medium text-sm" htmlFor="preview-seed">
+            Fixed preview seed
+          </label>
+          <Input
+            id="preview-seed"
+            onChange={(event) => setSeed(event.target.value)}
+            placeholder="Leave blank for a fresh sample"
+            type="text"
+            value={seed}
+          />
+          <p className="text-muted-foreground text-xs">
+            Use a seed to repeat the same sample. It is not saved with this
+            generator.
+          </p>
+        </div>
+      </details>
       {state.status === "loading" ? (
         <p
           aria-live="polite"
@@ -128,7 +135,7 @@ export function LivePreview({
         <output
           aria-label="Live preview result"
           aria-live="polite"
-          className="result-reveal mt-4 block max-h-96 overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-muted/60 p-3 font-mono text-sm"
+          className="result-reveal mt-4 block max-h-[34rem] overflow-auto overscroll-contain whitespace-pre-wrap break-words border border-border/70 bg-background/70 p-3 font-mono text-sm"
         >
           {formatPreview(state.value)}
         </output>
@@ -150,11 +157,6 @@ function UnavailablePreview({ error }: { readonly error: WebError }) {
     >
       <p className="font-medium">Preview unavailable</p>
       <p>{description.message}</p>
-      {error.kind === "system" ? null : (
-        <p className="font-mono text-xs">
-          {error.kind} / {error.code} at {formatPath(error.path)}
-        </p>
-      )}
     </div>
   );
 }
@@ -188,8 +190,4 @@ function formatPreview(value: unknown): string {
     return String(value);
   }
   return JSON.stringify(value, null, 2) ?? "undefined";
-}
-
-function formatPath(path: readonly (string | number)[]): string {
-  return path.length === 0 ? "definition" : path.join(".");
 }

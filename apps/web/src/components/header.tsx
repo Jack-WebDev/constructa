@@ -12,28 +12,28 @@ const links = [
   { to: "/", label: "Home", icon: Home },
   { to: "/builder", label: "Build", icon: Braces },
   { to: "/generators", label: "Library", icon: Compass },
-  { to: "/quick-generate", label: "Generate", icon: WandSparkles },
+  { to: "/quick-generate", label: "Examples", icon: WandSparkles },
 ] as const;
 
 export default function Header() {
   return (
     <>
-      <header className="sticky top-0 z-40 border-border/80 border-b bg-background/85 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 bg-background/70 backdrop-blur-sm">
         <nav
           aria-label="Primary navigation"
-          className="mx-auto flex h-18.5 max-w-7xl items-center justify-between px-4 sm:px-6"
+          className="mx-auto flex h-17 max-w-[960px] items-center justify-between px-4 sm:px-0"
         >
           <Link
             aria-label="Constructa home"
-            className="group flex items-center gap-2.5 font-serif text-2xl tracking-[-0.045em] focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="group flex items-center gap-2 font-serif text-[1.45rem] tracking-[-0.045em] focus-visible:rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             to="/"
           >
-            <span className="grid size-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm group-hover:-rotate-3">
-              <Sparkles className="size-4" />
+            <span className="grid size-9 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm group-hover:-rotate-3">
+              <Sparkles className="size-3.5" />
             </span>
             <span>constructa</span>
           </Link>
-          <div className="hidden h-full items-center gap-6 md:flex">
+          <div className="hidden h-full items-center gap-7 md:flex">
             {links.map(({ to, label }) => {
               return (
                 <Link
@@ -41,7 +41,7 @@ export default function Header() {
                     className:
                       "text-primary after:scale-x-100 after:bg-primary",
                   }}
-                  className="relative flex h-full items-center font-medium text-muted-foreground text-sm after:absolute after:right-0 after:bottom-3.75 after:left-0 after:h-0.5 after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform hover:text-foreground hover:after:scale-x-100"
+                  className="relative flex h-full items-center font-medium text-[11px] text-muted-foreground after:absolute after:right-0 after:bottom-2 after:left-0 after:h-px after:scale-x-0 after:bg-primary after:transition-transform hover:text-foreground hover:after:scale-x-100"
                   key={to}
                   to={to}
                 >
@@ -52,10 +52,10 @@ export default function Header() {
           </div>
           <div className="hidden items-center gap-4 md:flex">
             <Link
-              className="inline-flex h-10 items-center rounded-lg bg-primary px-4 font-medium text-primary-foreground text-sm shadow-sm transition-colors hover:bg-primary-hover"
+              className="inline-flex h-9 items-center rounded-lg bg-primary px-4 font-medium text-primary-foreground text-xs shadow-sm transition-colors hover:bg-primary-hover"
               to="/builder"
             >
-              <Plus className="size-4" /> Create generator
+              <Plus className="size-3.5" /> Create generator
             </Link>
           </div>
         </nav>
