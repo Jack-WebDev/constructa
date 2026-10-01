@@ -114,6 +114,11 @@ export type BuilderFieldDefinitionUpdate =
     }
   | { readonly success: false; readonly error: BuilderDraftError };
 
+/** The result of updating a definition at any recursive definition path. */
+export type BuilderDefinitionUpdate =
+  | { readonly success: true; readonly draft: BuilderDocumentDraft }
+  | { readonly success: false; readonly error: BuilderDraftError };
+
 export type CreateBuilderDraftOptions = {
   /** Supplies deterministic IDs for tests or application-owned state stores. */
   readonly createId?: () => BuilderUiId;
@@ -230,6 +235,14 @@ export function getBuilderObjectFields(
     const id = getBuilderDefinitionId(draft, path);
     return id === undefined ? [] : [{ definition, id, name, path }];
   });
+}
+
+/** Returns a raw definition at an object-field or array-item definition path. */
+export function getBuilderDefinition(
+  draft: BuilderDocumentDraft,
+  path: ValidationPath,
+): Readonly<Record<string, unknown>> | undefined {
+  return getDefinitionAtPath(draft.document, path);
 }
 
 /**
@@ -370,12 +383,20 @@ export function removeBuilderField(
   draft: BuilderDocumentDraft,
   fieldId: BuilderUiId,
 ): BuilderFieldRemove {
-  const fields = getRootObjectFields(draft?.document);
+  const field = getBuilderField(draft, fieldId);
+  if (field === undefined) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "The field to remove no longer exists.",
+        path: ["definition", "fields"],
+      },
+    };
+  }
+  const fields = getObjectFieldsAtPath(draft.document, field.path.slice(0, -2));
   if (fields === undefined) return invalidFieldOperation("removed");
-
-  const field = getBuilderFields(draft).find(
-    (candidate) => candidate.id === fieldId,
-  );
   if (field === undefined) {
     return {
       success: false,
@@ -389,20 +410,14 @@ export function removeBuilderField(
   }
 
   const { [field.name]: _removed, ...remainingFields } = fields;
-  const document = asRecord(draft.document);
-  const definition =
-    document === undefined ? undefined : asRecord(document.definition);
-  if (document === undefined || definition === undefined)
-    return invalidFieldOperation("removed");
-
-  return {
-    success: true,
-    draft: replaceBuilderDraftDocument(draft, {
-      ...document,
-      definition: { ...definition, fields: remainingFields },
-    }),
-    field,
-  };
+  const nextDraft = replaceObjectFields(
+    draft,
+    field.path.slice(0, -2),
+    remainingFields,
+  );
+  return nextDraft === undefined
+    ? invalidFieldOperation("removed")
+    : { success: true, draft: nextDraft, field };
 }
 
 /**
@@ -414,12 +429,12 @@ export function renameBuilderField(
   fieldId: BuilderUiId,
   name: string,
 ): BuilderFieldRename {
-  const fields = getRootObjectFields(draft?.document);
+  const field = getBuilderField(draft, fieldId);
+  const fields =
+    field === undefined
+      ? undefined
+      : getObjectFieldsAtPath(draft.document, field.path.slice(0, -2));
   if (fields === undefined) return invalidFieldOperation("renamed");
-
-  const field = getBuilderFields(draft).find(
-    (candidate) => candidate.id === fieldId,
-  );
   if (field === undefined) {
     return {
       success: false,
@@ -436,34 +451,23 @@ export function renameBuilderField(
   if (error !== undefined) return { success: false, error };
   if (name === field.name) return { success: true, draft, field };
 
-  const document = asRecord(draft.document);
-  const definition =
-    document === undefined ? undefined : asRecord(document.definition);
-  if (document === undefined || definition === undefined)
-    return invalidFieldOperation("renamed");
-
   const updatedFields: Record<string, unknown> = {};
   for (const [fieldName, fieldDefinition] of Object.entries(fields)) {
     updatedFields[fieldName === field.name ? name : fieldName] =
       fieldDefinition;
   }
-  const updatedDocument = {
-    ...document,
-    definition: { ...definition, fields: updatedFields },
-  };
-  const nextDraft = replaceBuilderDraftDocument(
-    {
-      ...draft,
-      definitionIdentities: draft.definitionIdentities.map((identity) => ({
-        ...identity,
-        path: renameFieldPath(identity.path, field.name, name),
-      })),
-    },
-    updatedDocument,
+  const renamedIdentities = draft.definitionIdentities.map((identity) => ({
+    ...identity,
+    path: renameFieldPath(identity.path, field.path, name),
+  }));
+  const preparedDraft = { ...draft, definitionIdentities: renamedIdentities };
+  const nextDraft = replaceObjectFields(
+    preparedDraft,
+    field.path.slice(0, -2),
+    updatedFields,
   );
-  const updatedField = getBuilderFields(nextDraft).find(
-    (candidate) => candidate.name === name,
-  );
+  if (nextDraft === undefined) return invalidFieldOperation("renamed");
+  const updatedField = getBuilderField(nextDraft, fieldId);
   if (updatedField === undefined) {
     return {
       success: false,
@@ -471,7 +475,7 @@ export function renameBuilderField(
         code: "SYSTEM_ERROR",
         kind: "system",
         message: "Unable to update the field identity.",
-        path: ["definition", "fields", name],
+        path: [...field.path.slice(0, -1), name],
       },
     };
   }
@@ -487,7 +491,19 @@ export function moveBuilderField(
   fieldId: BuilderUiId,
   direction: BuilderFieldMoveDirection,
 ): BuilderFieldMove {
-  const fields = getRootObjectFields(draft?.document);
+  const field = getBuilderField(draft, fieldId);
+  if (field === undefined) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "The field to move no longer exists.",
+        path: ["definition", "fields"],
+      },
+    };
+  }
+  const fields = getObjectFieldsAtPath(draft.document, field.path.slice(0, -2));
   if (fields === undefined) return invalidFieldOperation("moved");
   if (direction !== "up" && direction !== "down") {
     return {
@@ -501,7 +517,7 @@ export function moveBuilderField(
     };
   }
 
-  const fieldList = getBuilderFields(draft);
+  const fieldList = getBuilderObjectFields(draft, field.path.slice(0, -2));
   const index = fieldList.findIndex((field) => field.id === fieldId);
   if (index < 0) {
     return {
@@ -516,7 +532,7 @@ export function moveBuilderField(
   }
 
   const targetIndex = direction === "up" ? index - 1 : index + 1;
-  const field = fieldList[index];
+  const movedField = fieldList[index];
   if (targetIndex < 0 || targetIndex >= fieldList.length) {
     return {
       success: false,
@@ -524,7 +540,7 @@ export function moveBuilderField(
         code: "INVALID_CONFIGURATION",
         kind: "configuration",
         message: `The field is already ${direction === "up" ? "first" : "last"}.`,
-        path: field.path,
+        path: movedField.path,
       },
     };
   }
@@ -534,20 +550,14 @@ export function moveBuilderField(
   orderedFields[targetIndex] = orderedFields[index];
   orderedFields[index] = target;
 
-  const document = asRecord(draft.document);
-  const definition =
-    document === undefined ? undefined : asRecord(document.definition);
-  if (document === undefined || definition === undefined)
-    return invalidFieldOperation("moved");
-
-  return {
-    success: true,
-    draft: replaceBuilderDraftDocument(draft, {
-      ...document,
-      definition: { ...definition, fields: Object.fromEntries(orderedFields) },
-    }),
-    field,
-  };
+  const nextDraft = replaceObjectFields(
+    draft,
+    movedField.path.slice(0, -2),
+    Object.fromEntries(orderedFields),
+  );
+  return nextDraft === undefined
+    ? invalidFieldOperation("moved")
+    : { success: true, draft: nextDraft, field: movedField };
 }
 
 /**
@@ -559,7 +569,19 @@ export function selectBuilderFieldGenerator(
   fieldId: BuilderUiId,
   typeId: string,
 ): BuilderFieldGeneratorSelection {
-  const fields = getRootObjectFields(draft?.document);
+  const field = getBuilderField(draft, fieldId);
+  if (field === undefined) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "The field to update no longer exists.",
+        path: ["definition", "fields"],
+      },
+    };
+  }
+  const fields = getObjectFieldsAtPath(draft.document, field.path.slice(0, -2));
   if (fields === undefined) {
     return {
       success: false,
@@ -573,9 +595,6 @@ export function selectBuilderFieldGenerator(
     };
   }
 
-  const field = getBuilderFields(draft).find(
-    (candidate) => candidate.id === fieldId,
-  );
   if (field === undefined) {
     return {
       success: false,
@@ -608,32 +627,13 @@ export function selectBuilderFieldGenerator(
     return { success: true, draft, field };
   }
 
-  const document = asRecord(draft.document);
-  const objectDefinition =
-    document === undefined ? undefined : asRecord(document.definition);
-  if (document === undefined || objectDefinition === undefined) {
-    return {
-      success: false,
-      error: {
-        code: "INVALID_CONFIGURATION",
-        kind: "configuration",
-        message:
-          "Field generators can only be selected on an object generator.",
-        path: ["definition"],
-      },
-    };
-  }
-
-  const nextDraft = replaceBuilderDraftDocument(draft, {
-    ...document,
-    definition: {
-      ...objectDefinition,
-      fields: { ...fields, [field.name]: structuredClone(definition) },
-    },
-  });
-  const updatedField = getBuilderFields(nextDraft).find(
-    (candidate) => candidate.id === fieldId,
+  const nextDraft = replaceDefinitionDraft(
+    draft,
+    field.path,
+    structuredClone(definition),
   );
+  const updatedField =
+    nextDraft === undefined ? undefined : getBuilderField(nextDraft, fieldId);
   if (updatedField === undefined) {
     return {
       success: false,
@@ -645,6 +645,7 @@ export function selectBuilderFieldGenerator(
       },
     };
   }
+  if (nextDraft === undefined) return invalidFieldOperation("moved");
   return { success: true, draft: nextDraft, field: updatedField };
 }
 
@@ -657,12 +658,12 @@ export function updateBuilderFieldDefinition(
   fieldId: BuilderUiId,
   definition: unknown,
 ): BuilderFieldDefinitionUpdate {
-  const fields = getRootObjectFields(draft?.document);
+  const field = getBuilderField(draft, fieldId);
+  const fields =
+    field === undefined
+      ? undefined
+      : getObjectFieldsAtPath(draft.document, field.path.slice(0, -2));
   if (fields === undefined) return invalidFieldDefinitionUpdate();
-
-  const field = getBuilderFields(draft).find(
-    (candidate) => candidate.id === fieldId,
-  );
   if (field === undefined) {
     return {
       success: false,
@@ -700,22 +701,11 @@ export function updateBuilderFieldDefinition(
     };
   }
 
-  const document = asRecord(draft.document);
-  const objectDefinition =
-    document === undefined ? undefined : asRecord(document.definition);
-  if (document === undefined || objectDefinition === undefined)
-    return invalidFieldDefinitionUpdate();
-
-  const nextDraft = replaceBuilderDraftDocument(draft, {
-    ...document,
-    definition: {
-      ...objectDefinition,
-      fields: { ...fields, [field.name]: { ...properties } },
-    },
+  const nextDraft = replaceDefinitionDraft(draft, field.path, {
+    ...properties,
   });
-  const updatedField = getBuilderFields(nextDraft).find(
-    (candidate) => candidate.id === fieldId,
-  );
+  const updatedField =
+    nextDraft === undefined ? undefined : getBuilderField(nextDraft, fieldId);
   if (updatedField === undefined) {
     return {
       success: false,
@@ -727,7 +717,76 @@ export function updateBuilderFieldDefinition(
       },
     };
   }
+  if (nextDraft === undefined) return invalidFieldDefinitionUpdate();
   return { success: true, draft: nextDraft, field: updatedField };
+}
+
+/**
+ * Updates a definition at any recursive path. Its type is fixed so callers
+ * cannot accidentally use configuration edits to select another generator.
+ */
+export function updateBuilderDefinition(
+  draft: BuilderDocumentDraft,
+  path: ValidationPath,
+  definition: unknown,
+): BuilderDefinitionUpdate {
+  const current = getDefinitionAtPath(draft.document, path);
+  const next = asRecord(definition);
+  if (
+    current === undefined ||
+    next === undefined ||
+    typeof next.type !== "string"
+  ) {
+    return invalidDefinitionUpdate(path);
+  }
+  if (next.type !== getDefinitionType(current)) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "Field configuration cannot change the selected generator.",
+        path: [...path, "type"],
+      },
+    };
+  }
+  const nextDraft = replaceDefinitionDraft(draft, path, { ...next });
+  return nextDraft === undefined
+    ? invalidDefinitionUpdate(path)
+    : { success: true, draft: nextDraft };
+}
+
+/** Replaces a definition with an allowlisted generator example at any depth. */
+export function selectBuilderDefinitionGenerator(
+  draft: BuilderDocumentDraft,
+  path: ValidationPath,
+  typeId: string,
+): BuilderDefinitionUpdate {
+  const current = getDefinitionAtPath(draft.document, path);
+  const entry = BUILT_IN_GENERATOR_CATALOG.find(
+    (candidate) => candidate.typeId === typeId,
+  );
+  const definition = entry?.examples[0];
+  if (current === undefined || definition === undefined) {
+    return {
+      success: false,
+      error: {
+        code: "INVALID_CONFIGURATION",
+        kind: "configuration",
+        message: "The selected generator is not available.",
+        path: [...path, "type"],
+      },
+    };
+  }
+  if (getDefinitionType(current) === typeId) return { success: true, draft };
+  const nextDraft = replaceDefinitionDraft(
+    draft,
+    path,
+    structuredClone(definition),
+  );
+  return nextDraft === undefined
+    ? invalidDefinitionUpdate(path)
+    : { success: true, draft: nextDraft };
 }
 
 /**
@@ -836,16 +895,24 @@ function updateIdentityProperty(
   }
 }
 
-function getRootObjectFields(
-  document: unknown,
-): Record<string, unknown> | undefined {
-  const documentRecord = asRecord(document);
+function getBuilderField(
+  draft: BuilderDocumentDraft,
+  fieldId: BuilderUiId,
+): BuilderFieldDraft | undefined {
+  const identity = draft.definitionIdentities.find(
+    (candidate) =>
+      candidate.id === fieldId && candidate.path.at(-2) === "fields",
+  );
+  const name = identity?.path.at(-1);
   const definition =
-    documentRecord === undefined
+    identity === undefined
       ? undefined
-      : asRecord(documentRecord.definition);
-  if (definition?.type !== "object") return undefined;
-  return asRecord(definition.fields);
+      : getDefinitionAtPath(draft.document, identity.path);
+  return typeof name === "string" &&
+    definition !== undefined &&
+    identity !== undefined
+    ? { definition, id: identity.id, name, path: identity.path }
+    : undefined;
 }
 
 function getObjectFieldsAtPath(
@@ -868,18 +935,21 @@ function getDefinitionAtPath(
     documentRecord === undefined
       ? undefined
       : asRecord(documentRecord.definition);
-  for (
-    let index = 1;
-    definition !== undefined && index < path.length;
-    index += 2
-  ) {
+  for (let index = 1; definition !== undefined && index < path.length; ) {
+    const segment = path[index];
+    if (segment === "item") {
+      definition = asRecord(definition.item);
+      index += 1;
+      continue;
+    }
     const fieldName = path[index + 1];
     const fields =
-      path[index] === "fields" ? asRecord(definition.fields) : undefined;
+      segment === "fields" ? asRecord(definition.fields) : undefined;
     definition =
       typeof fieldName === "string" && fields !== undefined
         ? asRecord(fields[fieldName])
         : undefined;
+    index += 2;
   }
   return definition;
 }
@@ -896,6 +966,14 @@ function replaceDefinitionAtPath(
     index: number,
   ): Record<string, unknown> | undefined => {
     if (index === segments.length) return replacement;
+    if (segments[index] === "item") {
+      const item = asRecord(current.item);
+      if (item === undefined) return undefined;
+      const updatedItem = replace(item, index + 1);
+      return updatedItem === undefined
+        ? undefined
+        : { ...current, item: updatedItem };
+    }
     const fieldName = segments[index + 1];
     const fields =
       segments[index] === "fields" ? asRecord(current.fields) : undefined;
@@ -911,18 +989,47 @@ function replaceDefinitionAtPath(
 }
 
 function isDefinitionPath(path: ValidationPath): boolean {
-  return (
-    Array.isArray(path) &&
-    path[0] === "definition" &&
-    path.length % 2 === 1 &&
-    path.every((segment, index) =>
-      index === 0
-        ? segment === "definition"
-        : index % 2 === 1
-          ? segment === "fields"
-          : typeof segment === "string",
-    )
-  );
+  if (!Array.isArray(path) || path[0] !== "definition") return false;
+  for (let index = 1; index < path.length; ) {
+    if (path[index] === "item") {
+      index += 1;
+      continue;
+    }
+    if (path[index] !== "fields" || typeof path[index + 1] !== "string") {
+      return false;
+    }
+    index += 2;
+  }
+  return true;
+}
+
+function replaceDefinitionDraft(
+  draft: BuilderDocumentDraft,
+  path: ValidationPath,
+  replacement: Record<string, unknown>,
+): BuilderDocumentDraft | undefined {
+  const document = asRecord(draft.document);
+  const rootDefinition =
+    document === undefined ? undefined : asRecord(document.definition);
+  if (document === undefined || rootDefinition === undefined) return undefined;
+  const definition = replaceDefinitionAtPath(rootDefinition, path, replacement);
+  return definition === undefined
+    ? undefined
+    : replaceBuilderDraftDocument(draft, { ...document, definition });
+}
+
+function replaceObjectFields(
+  draft: BuilderDocumentDraft,
+  objectPath: ValidationPath,
+  fields: Record<string, unknown>,
+): BuilderDocumentDraft | undefined {
+  const objectDefinition = getDefinitionAtPath(draft.document, objectPath);
+  return objectDefinition?.type !== "object"
+    ? undefined
+    : replaceDefinitionDraft(draft, objectPath, {
+        ...objectDefinition,
+        fields,
+      });
 }
 
 function nextFieldName(fields: Record<string, unknown>): string {
@@ -994,22 +1101,34 @@ function validateFieldName(
 
 function renameFieldPath(
   path: ValidationPath,
-  previousName: string,
+  previousPath: ValidationPath,
   nextName: string,
 ): ValidationPath {
-  const previousPrefix = ["definition", "fields", previousName];
   if (
-    path.length < previousPrefix.length ||
-    !previousPrefix.every((segment, index) => path[index] === segment)
+    path.length < previousPath.length ||
+    !previousPath.every((segment, index) => path[index] === segment)
   ) {
     return path;
   }
   return [
-    "definition",
-    "fields",
+    ...previousPath.slice(0, -1),
     nextName,
-    ...path.slice(previousPrefix.length),
+    ...path.slice(previousPath.length),
   ];
+}
+
+function invalidDefinitionUpdate(
+  path: ValidationPath,
+): BuilderDefinitionUpdate {
+  return {
+    success: false,
+    error: {
+      code: "INVALID_CONFIGURATION",
+      kind: "configuration",
+      message: "Field configuration must be a flat generator definition.",
+      path: [...path],
+    },
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
