@@ -110,7 +110,7 @@ describe("cross-surface portable document contract", () => {
     const seed = "web-preview";
     const expected = generate(SEEDED_DOCUMENT.definition, { seed });
     render(<LivePreview draft={createBuilderDraft(SEEDED_DOCUMENT)} />);
-    fireEvent.change(screen.getByLabelText("Preview seed (optional)"), {
+    fireEvent.change(screen.getByLabelText("Fixed preview seed"), {
       target: { value: seed },
     });
     await act(async () => {

@@ -1,4 +1,5 @@
 import { Button } from "@constructa/ui/components/button";
+import { Copy, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { describeWebError } from "../errors/error-presentation";
@@ -22,24 +23,77 @@ export type ClipboardWriter = Pick<Clipboard, "writeText">;
 
 export function ResultPreview({
   clipboard,
+  onGenerate,
   state,
 }: {
   readonly clipboard?: ClipboardWriter;
+  readonly onGenerate?: () => void;
   readonly state: ResultPreviewState;
 }) {
+  const [copyStatus, setCopyStatus] = useState<
+    "idle" | "copying" | "success" | "error"
+  >("idle");
+  const preview = state.status === "success" ? formatPreview(state.value) : "";
+  const overflow = preview.length > MAX_PREVIEW_LENGTH;
+  const visiblePreview = overflow
+    ? `${preview.slice(0, MAX_PREVIEW_LENGTH)}…`
+    : preview;
+
+  async function copyPreview() {
+    setCopyStatus("copying");
+    try {
+      await copyToClipboard(preview, clipboard);
+      setCopyStatus("success");
+    } catch {
+      setCopyStatus("error");
+    }
+  }
+
   return (
     <section
       aria-labelledby="result-title"
-      className="app-surface scroll-mt-4 rounded-2xl p-5 sm:p-6"
+      className="scroll-mt-4 rounded-2xl border border-border/80 bg-card/90 p-5 shadow-foreground/5 shadow-lg"
     >
-      <h2 className="font-medium text-lg" id="result-title">
-        Result
-      </h2>
-      {state.status === "idle" ? (
-        <p className="mt-3 text-muted-foreground text-sm">
-          Choose a generator, set its options, then generate a value.
-        </p>
-      ) : null}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2
+            className="font-serif text-2xl tracking-[-0.03em]"
+            id="result-title"
+          >
+            Result
+          </h2>
+          <p className="mt-1 text-muted-foreground text-xs">
+            Choose a generator, set its options, then generate a value.
+          </p>
+        </div>
+        {state.status === "success" ? (
+          <div className="flex shrink-0 gap-2">
+            <Button
+              aria-label="Copy result"
+              className="h-8 rounded-lg px-3 text-[10px]"
+              disabled={copyStatus === "copying"}
+              onClick={copyPreview}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Copy className="size-3" />
+              {copyStatus === "copying" ? "Copying…" : "Copy value"}
+            </Button>
+            {onGenerate === undefined ? null : (
+              <Button
+                className="h-8 rounded-lg px-3 text-[10px]"
+                onClick={onGenerate}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <RefreshCw className="size-3" /> Generate again
+              </Button>
+            )}
+          </div>
+        ) : null}
+      </div>
       {state.status === "loading" ? (
         <p
           aria-live="polite"
@@ -50,11 +104,35 @@ export function ResultPreview({
         </p>
       ) : null}
       {state.status === "success" ? (
-        <SuccessPreview
-          clipboard={clipboard}
-          key={formatPreview(state.value)}
-          value={state.value}
-        />
+        <>
+          <output
+            aria-label="Generated result"
+            aria-live="polite"
+            className="result-reveal mt-3 flex h-20 max-h-[50dvh] items-center overflow-auto overscroll-contain rounded-xl border border-border/70 bg-muted/60 px-5 font-serif text-5xl tracking-[-0.04em] sm:max-h-96"
+          >
+            {visiblePreview}
+          </output>
+          <p aria-live="polite" className="sr-only">
+            Generated result ready.
+          </p>
+          {copyStatus === "success" ? (
+            <p className="mt-2 text-muted-foreground text-xs" role="status">
+              Copied result.
+            </p>
+          ) : null}
+          {copyStatus === "error" ? (
+            <p className="mt-2 text-destructive text-xs" role="alert">
+              Unable to copy the result. Check clipboard permissions and try
+              again.
+            </p>
+          ) : null}
+          {overflow ? (
+            <p className="mt-2 text-muted-foreground text-xs" role="status">
+              Preview truncated; the generated value is longer than{" "}
+              {MAX_PREVIEW_LENGTH.toLocaleString()} characters.
+            </p>
+          ) : null}
+        </>
       ) : null}
       {state.status === "error" ? <ErrorPreview error={state.error} /> : null}
     </section>
@@ -78,79 +156,6 @@ function ErrorPreview({ error }: { readonly error: ResultPreviewError }) {
         </p>
       )}
     </div>
-  );
-}
-
-function SuccessPreview({
-  clipboard,
-  value,
-}: {
-  readonly clipboard?: ClipboardWriter;
-  readonly value: unknown;
-}) {
-  const preview = formatPreview(value);
-  const [copyStatus, setCopyStatus] = useState<
-    "idle" | "copying" | "success" | "error"
-  >("idle");
-  const overflow = preview.length > MAX_PREVIEW_LENGTH;
-  const visiblePreview = overflow
-    ? `${preview.slice(0, MAX_PREVIEW_LENGTH)}…`
-    : preview;
-
-  async function copyPreview() {
-    setCopyStatus("copying");
-    try {
-      await copyToClipboard(preview, clipboard);
-      setCopyStatus("success");
-    } catch {
-      setCopyStatus("error");
-    }
-  }
-
-  return (
-    <>
-      <output
-        aria-label="Generated result"
-        aria-live="polite"
-        className="result-reveal mt-3 block max-h-[50dvh] overflow-auto overscroll-contain whitespace-pre-wrap break-words rounded-xl border border-border/70 bg-muted/60 p-3 font-mono text-sm sm:max-h-96"
-      >
-        {visiblePreview}
-      </output>
-      <p aria-live="polite" className="sr-only">
-        Generated result ready.
-      </p>
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button
-          className="h-11 rounded-xl text-sm focus-visible:ring-2"
-          disabled={copyStatus === "copying"}
-          onClick={copyPreview}
-          type="button"
-        >
-          {copyStatus === "copying" ? "Copying…" : "Copy result"}
-        </Button>
-        {copyStatus === "success" ? (
-          <p
-            aria-live="polite"
-            className="text-muted-foreground text-xs"
-            role="status"
-          >
-            Copied result.
-          </p>
-        ) : null}
-        {copyStatus === "error" ? (
-          <p className="text-destructive text-xs" role="alert">
-            Unable to copy the result. Check clipboard permissions and try
-            again.
-          </p>
-        ) : null}
-      </div>
-      {overflow ? (
-        <p className="mt-2 text-muted-foreground text-xs" role="status">
-          Preview truncated; the generated value is longer than{" "}
-          {MAX_PREVIEW_LENGTH.toLocaleString()} characters.
-        </p>
-      ) : null}
-    </>
   );
 }
 

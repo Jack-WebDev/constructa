@@ -77,19 +77,17 @@ export function BuilderValidationSummary({
         {issues.map((issue, index) => (
           <li key={`${issue.path.join(".")}:${issue.code}:${index}`}>
             {issue.fieldId === undefined ? (
-              <>
-                {formatPath(issue.path)}: {issue.message}
-              </>
+              issue.message
             ) : (
               <a
-                aria-label={`${formatPath(issue.path)}: ${issue.message}`}
+                aria-label={`Review field: ${issue.message}`}
                 href={`#builder-field-${issue.fieldId}`}
                 onClick={(event) => {
                   event.preventDefault();
                   onFocus(issue.fieldId as BuilderUiId);
                 }}
               >
-                Go to {formatPath(issue.path)}
+                Review field: {issue.message}
               </a>
             )}
           </li>
@@ -111,7 +109,7 @@ export function BuilderInlineValidationIssues({
     <ul aria-live="polite" className="mt-2 space-y-1 text-destructive text-xs">
       {issues.map((issue, index) => (
         <li key={`${issue.path.join(".")}:${issue.code}:${index}`}>
-          {formatPath(issue.path)}: {issue.message}
+          {issue.message}
         </li>
       ))}
     </ul>
@@ -191,8 +189,4 @@ function findOwningFieldId(
     if (id !== undefined) return id;
   }
   return undefined;
-}
-
-function formatPath(path: readonly (string | number)[]): string {
-  return path.length === 0 ? "definition" : path.join(".");
 }

@@ -1,5 +1,5 @@
 import { Badge } from "@constructa/ui/components/badge";
-import { Button } from "@constructa/ui/components/button";
+import { buttonVariants } from "@constructa/ui/components/button";
 import {
   Card,
   CardContent,
@@ -18,18 +18,25 @@ import {
 import {
   ArrowRight,
   Blocks,
+  BookOpen,
+  Box,
   Braces,
-  Check,
+  CalendarDays,
   Code2,
-  Database,
+  Copy,
   Eye,
-  FlaskConical,
-  Globe2,
+  Hash,
+  Hexagon,
   Layers3,
-  Leaf,
+  MoreHorizontal,
   Play,
   Plus,
-  TerminalSquare,
+  Settings2,
+  ShieldCheck,
+  ToggleRight,
+  Type,
+  UsersRound,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -40,213 +47,166 @@ const EMPLOYEE_DEFINITION = object({
   active: boolean(),
 });
 
-const EMPLOYEE_PREVIEW = generate(EMPLOYEE_DEFINITION, {
-  seed: "homepage",
-});
+const EMPLOYEE_PREVIEW = generate(EMPLOYEE_DEFINITION, { seed: "homepage" });
 
 const EMPLOYEE_OUTPUT = JSON.stringify(
   {
     ...EMPLOYEE_PREVIEW,
-    joinDate: "2024-05-12",
+    startDate: "2024-05-12",
     department: "Product",
   },
   null,
   2,
 );
 
-const COMPOSITION_STEPS = [
-  { label: "UUID", value: "id" },
-  { label: "Integer", value: "employeeNumber" },
-  { label: "Choice", value: "role" },
-  { label: "Boolean", value: "active" },
-  { label: "Date", value: "joinDate" },
-  { label: "String", value: "department" },
+const COMPOSITION_FIELDS = [
+  { icon: Hexagon, name: "id", type: "Integer" },
+  { icon: Hash, name: "employeeNumber", type: "String" },
+  { icon: Blocks, name: "role", type: "Choice" },
+  { icon: ToggleRight, name: "isActive", type: "Boolean" },
+  { icon: CalendarDays, name: "startDate", type: "Date" },
+  { icon: Type, name: "department", type: "String" },
+] as const;
+
+const BENEFITS = [
+  {
+    icon: Zap,
+    title: "No login required",
+    description: "Get started instantly",
+  },
+  { icon: ShieldCheck, title: "Open source", description: "Build and extend" },
+  { icon: Box, title: "Works anywhere", description: "Web app and SDK" },
 ] as const;
 
 const FEATURES = [
   {
-    icon: Blocks,
-    title: "Compose visually",
+    icon: Box,
+    title: "Generate test data",
     description:
-      "Start with a blank generator and add only the fields you need.",
-    action: "Open builder",
+      "Create realistic, customised data for testing and development.",
+    action: "Explore examples",
+    href: "/quick-generate",
+  },
+  {
+    icon: Code2,
+    title: "Power it by design",
+    description:
+      "Define rich schemas and reuse them across projects and workflows.",
+    action: "Learn how",
     href: "/builder",
   },
   {
-    icon: Braces,
-    title: "Portable by design",
-    description:
-      "Choose a built-in generator, understand its options, and reuse it anywhere.",
-    action: "Browse generators",
-    href: "/generators",
-  },
-  {
     icon: Layers3,
-    title: "Ready to reuse",
+    title: "Extend to more",
     description:
-      "Generate a sample value before you add it to a larger definition.",
-    action: "Browse generators",
+      "Build generators for your domain and keep dependable definitions close.",
+    action: "Browse library",
     href: "/generators",
   },
 ] as const;
 
 const CAPABILITIES = [
-  [Globe2, "Web app"],
-  [Braces, "SDK"],
-  [Code2, "API"],
-  [TerminalSquare, "CLI"],
-  [FlaskConical, "Tests"],
-  [Database, "Data pipelines"],
+  [Braces, "Developer friendly"],
+  [Layers3, "Type safe"],
+  [Settings2, "Extensible"],
+  [UsersRound, "Reusable"],
+  [BookOpen, "Great documentation"],
 ] as const;
 
 export function Homepage() {
   return (
-    <main className="app-page min-h-screen overflow-hidden bg-background text-foreground">
-      <section
-        aria-labelledby="homepage-title"
-        className="relative border-border border-b"
-      >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,color-mix(in_srgb,var(--primary)_6%,transparent),transparent_30%),radial-gradient(circle_at_80%_30%,color-mix(in_srgb,var(--chart-2)_6%,transparent),transparent_32%)]" />
-
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-5 py-16 sm:px-8 sm:py-20 lg:grid-cols-[0.85fr_1.15fr] lg:gap-16 lg:py-24">
-          <div className="fade-in slide-in-from-bottom-4 animate-in duration-700">
-            <Badge
-              variant="outline"
-              className="rounded-full border-border/70 bg-secondary px-3 py-1 text-secondary-foreground"
-            >
-              <Leaf className="size-3" />
-              Composed. Typed. Reliable.
-            </Badge>
-
-            <div className="mt-8 max-w-xl">
-              <h1
-                aria-label="Generate what you need."
-                id="homepage-title"
-                className="font-serif text-5xl leading-[0.98] tracking-[-0.045em] sm:text-6xl lg:text-[4.8rem]"
-              >
-                Generate
-                <br />
-                what{" "}
-                <span className="relative inline-block font-normal text-primary italic">
-                  you
-                  <svg
-                    aria-hidden="true"
-                    className="absolute -bottom-3 left-0 h-3 w-full"
-                    viewBox="0 0 160 14"
-                    preserveAspectRatio="none"
-                  >
-                    <path
-                      d="M3 10C48 2 106 2 157 8"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeLinecap="round"
-                      strokeWidth="3"
-                    />
-                  </svg>
-                </span>{" "}
-                need.
-              </h1>
-
-              <p className="mt-7 max-w-lg text-base text-muted-foreground leading-7 sm:text-lg sm:leading-8">
-                Build reusable generators for fixtures, test data, and product
-                workflows—then produce dependable data whenever you need it.
-              </p>
-            </div>
-
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Button
-                render={<a href="/builder" />}
-                size="lg"
-                className="h-12 rounded-xl border-primary px-7 text-sm shadow-lg shadow-primary/15 hover:bg-primary-hover"
-              >
-                Start Building
-                <ArrowRight className="size-4" />
-              </Button>
-
-              <Button
-                render={<a href="/quick-generate" />}
-                size="lg"
-                variant="outline"
-                className="h-12 rounded-xl border-border bg-card/70 px-7 text-foreground text-sm hover:bg-secondary"
-              >
-                <Play className="size-4" />
-                Quick Generate
-              </Button>
-            </div>
-
-            <div className="mt-9 flex flex-wrap gap-x-7 gap-y-3 text-muted-foreground text-xs">
-              {[
-                "Start with built-in generators",
-                "Keep definitions portable",
-                "Catch invalid settings early",
-              ].map((item) => (
-                <span key={item} className="flex items-center gap-2">
-                  <span className="grid size-4 place-items-center rounded-full border border-success/70">
-                    <Check className="size-2.5 text-success" />
-                  </span>
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <CompositionDemo />
-        </div>
-      </section>
-
-      <section className="relative">
-        <div className="pointer-events-none absolute inset-0 bg-muted/70" />
-
-        <div className="relative mx-auto max-w-7xl px-5 py-12 sm:px-8 sm:py-16">
-          <div className="mb-7 text-center">
-            <p className="font-semibold text-[11px] text-success uppercase tracking-[0.18em]">
-              <Check className="mr-1 inline size-3" />
-              One clear workflow
-            </p>
-
-            <h2 className="mt-2 font-serif text-3xl tracking-[-0.035em] sm:text-4xl">
-              From idea to{" "}
-              <em className="font-normal text-primary">useful data.</em>
-            </h2>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-3">
-            {FEATURES.map(
-              ({ action, description, href, icon: Icon, title }) => (
-                <Card
-                  key={title}
-                  className="app-interactive-card group rounded-2xl border border-border bg-card/85 py-0 shadow-foreground/5 shadow-lg"
-                >
-                  <CardHeader className="p-6">
-                    <span className="mb-5 grid size-12 place-items-center rounded-full bg-accent text-accent-foreground">
-                      <Icon className="size-5" />
-                    </span>
-
-                    <CardTitle className="text-base text-card-foreground">
-                      {title}
-                    </CardTitle>
-
-                    <CardDescription className="mt-1 max-w-xs text-muted-foreground text-sm leading-6">
-                      {description}
-                    </CardDescription>
-
-                    <a
-                      href={href}
-                      className="mt-4 inline-flex items-center gap-1.5 font-medium text-primary text-xs transition group-hover:gap-2.5"
-                    >
-                      {action}
-                      <ArrowRight className="size-3.5" />
-                    </a>
-                  </CardHeader>
-                </Card>
-              ),
-            )}
-          </div>
-
-          <Capabilities />
-        </div>
-      </section>
+    <main className="app-page overflow-hidden bg-background text-foreground">
+      <Hero />
+      <WorkflowSection />
     </main>
+  );
+}
+
+function Hero() {
+  return (
+    <section
+      aria-labelledby="homepage-title"
+      className="relative isolate min-h-[480px] overflow-hidden border-border/60 border-b"
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 bg-center bg-cover"
+        style={{
+          backgroundImage:
+            'url("/Minimal%20Beige%20Botanical%20Still%20Life.png")',
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0 bg-background/35"
+      />
+
+      <div className="relative z-10 mx-auto grid max-w-[1050px] items-start gap-12 px-5 py-12 sm:px-8 sm:py-16 lg:min-h-[480px] lg:translate-x-12 lg:grid-cols-[400px_594px] lg:gap-14 lg:px-0 lg:py-0">
+        <div className="max-w-xl lg:pt-10">
+          <Badge className="rounded-full border-0 bg-secondary/85 px-4 py-1.5 font-medium text-[10px] text-secondary-foreground uppercase tracking-[0.18em]">
+            Open source <span aria-hidden="true">•</span> Type safe{" "}
+            <span aria-hidden="true">•</span> Customisable
+          </Badge>
+
+          <h1
+            id="homepage-title"
+            className="mt-7 font-serif text-5xl leading-[0.94] tracking-[-0.055em] sm:text-6xl lg:text-[4rem]"
+          >
+            Generate <br />
+            what <em className="font-normal text-primary">you</em> need.
+          </h1>
+
+          <p className="mt-6 max-w-[30rem] text-base text-muted-foreground leading-7 sm:text-lg sm:leading-7">
+            Build reusable generators for fixtures, test data, and product
+            workflows — then produce dependable data whenever you need it.
+          </p>
+
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <a
+              className={buttonVariants({
+                className:
+                  "h-12 rounded-xl px-7 text-sm shadow-lg shadow-primary/20 hover:bg-primary-hover",
+                size: "lg",
+              })}
+              href="/builder"
+            >
+              Start building <ArrowRight className="size-4" />
+            </a>
+            <a
+              className={buttonVariants({
+                className:
+                  "h-12 rounded-xl border-border/90 bg-card/75 px-7 text-foreground text-sm shadow-sm hover:bg-card",
+                size: "lg",
+                variant: "outline",
+              })}
+              href="/quick-generate"
+            >
+              <Play className="size-3.5" /> Quick generate
+            </a>
+          </div>
+
+          <ul className="mt-8 grid gap-4 text-left sm:grid-cols-3 sm:gap-3">
+            {BENEFITS.map(({ description, icon: Icon, title }) => (
+              <li className="flex items-center gap-2.5" key={title}>
+                <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-accent-foreground">
+                  <Icon aria-hidden="true" className="size-3.5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block whitespace-nowrap font-semibold text-[11px]">
+                    {title}
+                  </span>
+                  <span className="block whitespace-nowrap text-[10px] text-muted-foreground">
+                    {description}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <CompositionDemo />
+      </div>
+    </section>
   );
 }
 
@@ -265,93 +225,84 @@ function CompositionDemo() {
   }
 
   return (
-    <section
-      aria-labelledby="composition-demo-title"
-      className="fade-in zoom-in-95 relative animate-in duration-700 lg:delay-150"
-    >
-      <div className="absolute -inset-8 -z-10 rounded-4xl bg-chart-4/15 blur-3xl" />
-
-      <Card className="overflow-hidden rounded-2xl border border-border bg-card/95 py-0 shadow-2xl shadow-foreground/15">
-        <CardHeader className="border-border/80 border-b px-5 py-5 sm:px-6">
+    <section aria-labelledby="composition-demo-title" className="w-full">
+      <Card className="overflow-hidden rounded-[18px] border-border/85 bg-card/95 py-0 shadow-foreground/10 shadow-xl">
+        <CardHeader className="border-border/75 border-b px-5 py-5 sm:px-6">
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-semibold text-[11px] text-success uppercase tracking-[0.18em]">
+            <div className="min-w-0">
+              <p className="font-semibold text-[10px] text-secondary-foreground uppercase tracking-[0.18em]">
                 Compose primitives
               </p>
-
-              <h2
+              <CardTitle
+                className="mt-1 font-serif text-2xl tracking-[-0.03em] sm:text-[1.65rem]"
                 id="composition-demo-title"
-                className="mt-1 font-serif text-2xl tracking-[-0.02em]"
               >
                 Employee generator
-              </h2>
+              </CardTitle>
             </div>
-
-            <div className="hidden items-center gap-2 sm:flex">
-              <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 text-xs">
-                <Braces className="size-3.5" />
-                JSON
+            <div className="hidden shrink-0 items-center gap-2 sm:flex">
+              <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-muted/55 px-3 text-xs">
+                <Braces aria-hidden="true" className="size-3.5" /> JSON
               </span>
-
-              <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-muted/60 px-3 text-xs">
-                <Eye className="size-3.5" />
-                Preview
+              <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-muted/55 px-3 text-xs">
+                <Eye aria-hidden="true" className="size-3.5" /> Preview
               </span>
             </div>
           </div>
-
-          <CardDescription className="text-muted-foreground text-sm">
+          <CardDescription className="mt-1.5 max-w-lg text-muted-foreground text-sm">
             Small, focused generators become a structured reusable object.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="p-5 sm:p-6">
           <ol
-            aria-label="Primitive generators"
+            aria-label="Employee generator fields"
             className="grid gap-2 sm:grid-cols-2"
           >
-            {COMPOSITION_STEPS.map((step, index) => (
+            {COMPOSITION_FIELDS.map(({ icon: Icon, name, type }) => (
               <li
-                key={step.value}
-                className="flex items-center gap-3 rounded-lg border border-border/80 bg-muted/60 px-3 py-2.5"
+                className="flex h-10 items-center gap-2.5 rounded-lg border border-border/80 bg-muted/55 px-3"
+                key={name}
               >
-                <span className="grid size-5 place-items-center rounded-full bg-secondary font-semibold text-[10px] text-secondary-foreground">
-                  {index + 1}
+                <span className="grid size-5 place-items-center rounded-md bg-accent text-accent-foreground">
+                  <Icon aria-hidden="true" className="size-3" />
                 </span>
-
-                <span className="font-medium text-sm">{step.label}</span>
-
-                <code className="ml-auto text-muted-foreground text-xs">
-                  {step.value}
-                </code>
+                <span className="min-w-0 flex-1 truncate text-[11px] text-foreground">
+                  {name}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {type}
+                </span>
+                <MoreHorizontal
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-foreground"
+                />
               </li>
             ))}
           </ol>
 
           <a
+            className="mt-3 flex h-10 items-center justify-center gap-2 rounded-lg border border-primary/50 border-dashed font-medium text-primary text-xs hover:bg-primary/8"
             href="/builder"
-            className="mt-3 flex h-10 items-center justify-center gap-2 rounded-lg border border-primary/60 border-dashed font-medium text-primary text-xs transition hover:bg-primary/10"
           >
-            <Plus className="size-3.5" />
-            Add field
+            <Plus aria-hidden="true" className="size-3.5" /> Add field
           </a>
 
-          <div className="mt-4 rounded-xl border border-border bg-muted p-4">
+          <div className="mt-3 rounded-xl bg-muted/70 p-4">
             <div className="flex items-center justify-between gap-3">
-              <p className="font-semibold text-success text-xs">
-                GENERATED EMPLOYEE
+              <p className="font-semibold text-[10px] text-secondary-foreground uppercase tracking-[0.16em]">
+                Generated employee
               </p>
-
               <button
-                type="button"
                 aria-describedby="copy-status"
-                className="rounded-md border border-border bg-card px-2.5 py-1 text-[10px] text-muted-foreground transition hover:bg-secondary"
+                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-[10px] text-foreground shadow-sm hover:bg-secondary"
                 onClick={copyPreview}
+                type="button"
               >
+                <Copy aria-hidden="true" className="size-3" />
                 {copyStatus === "copied" ? "Copied" : "Copy JSON"}
               </button>
             </div>
-
             <p
               aria-live="polite"
               className="sr-only"
@@ -364,10 +315,7 @@ function CompositionDemo() {
                   ? "Unable to copy employee JSON."
                   : ""}
             </p>
-
-            <pre className="mt-3 overflow-x-auto text-foreground/80 text-xs leading-5 sm:text-sm">
-              {EMPLOYEE_OUTPUT}
-            </pre>
+            <JsonPreview />
           </div>
         </CardContent>
       </Card>
@@ -375,29 +323,130 @@ function CompositionDemo() {
   );
 }
 
-function Capabilities() {
+function JsonPreview() {
   return (
-    <section className="mt-5 overflow-hidden rounded-2xl bg-chart-2 text-primary-foreground shadow-chart-2/20 shadow-xl">
-      <div className="grid md:grid-cols-[260px_1fr]">
-        <div className="border-background/25 px-6 py-5 md:border-r">
-          <h2 className="font-serif text-xl">Built for modern teams</h2>
+    <pre className="mt-3 overflow-x-auto font-mono text-[11px] leading-5 sm:text-xs">
+      {EMPLOYEE_OUTPUT.split("\n").map((line, index) => (
+        <span className="block min-w-max" key={`${index}-${line}`}>
+          <span
+            aria-hidden="true"
+            className="mr-4 inline-block w-2 text-right text-muted-foreground/65"
+          >
+            {index + 1}
+          </span>
+          <JsonLine line={line} />
+        </span>
+      ))}
+    </pre>
+  );
+}
 
-          <p className="mt-1 max-w-48 text-primary-foreground/75 text-xs leading-5">
-            Use Constructa everywhere your data flows.
+function JsonLine({ line }: { readonly line: string }) {
+  const match = /^(\s*)("[^"]+")(\s*:\s*)(.+?)(,?)$/.exec(line);
+  if (match === null) return <>{line}</>;
+
+  const [, indentation, key, separator, value, trailingComma] = match;
+  const valueClassName = value.startsWith('"')
+    ? "text-[#2f7161]"
+    : value === "true" || value === "false" || value === "null"
+      ? "text-[#745aa3]"
+      : "text-[#2f78ae]";
+
+  return (
+    <>
+      {indentation}
+      <span className="text-[#b54d38]">{key}</span>
+      <span className="text-foreground/75">{separator}</span>
+      <span className={valueClassName}>{value}</span>
+      <span className="text-foreground/75">{trailingComma}</span>
+    </>
+  );
+}
+
+function WorkflowSection() {
+  return (
+    <section className="relative bg-background px-5 pt-4 pb-3 sm:px-8 lg:px-0">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(ellipse_at_50%_0%,color-mix(in_srgb,var(--accent)_40%,transparent),transparent_70%)]"
+      />
+      <div className="relative mx-auto max-w-[1000px]">
+        <header className="mx-auto max-w-2xl text-center">
+          <p className="font-semibold text-[10px] text-secondary-foreground uppercase tracking-[0.2em]">
+            A generator for every need
           </p>
-        </div>
+          <h2 className="mt-2 font-serif text-3xl tracking-[-0.04em] sm:text-4xl">
+            From idea to{" "}
+            <em className="font-normal text-primary">useful data.</em>
+          </h2>
+          <p className="mt-2 text-muted-foreground text-sm leading-6">
+            Create, customise and generate data for any context. Keep it simple
+            or build something advanced.
+          </p>
+        </header>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
-          {CAPABILITIES.map(([Icon, label]) => (
-            <div
-              key={label}
-              className="flex min-h-20 items-center justify-center gap-2 border-background/20 px-4 text-primary-foreground/90 text-xs [&:not(:last-child)]:border-r"
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          {FEATURES.map(({ action, description, href, icon: Icon, title }) => (
+            <Card
+              className="group min-h-[124px] rounded-xl border-border/80 bg-card/90 py-0 shadow-foreground/5 shadow-lg transition-[border-color,box-shadow] hover:border-primary/35 hover:shadow-foreground/8 hover:shadow-xl"
+              key={title}
             >
-              <Icon className="size-5 text-accent" />
-              <span>{label}</span>
-            </div>
+              <CardHeader className="grid h-full grid-cols-[44px_1fr] gap-3 p-4">
+                <span className="grid size-11 place-items-center rounded-full bg-accent text-accent-foreground">
+                  <Icon aria-hidden="true" className="size-5" />
+                </span>
+                <div className="flex min-w-0 flex-col">
+                  <CardTitle className="font-serif text-[15px] tracking-[-0.02em]">
+                    {title}
+                  </CardTitle>
+                  <CardDescription className="mt-2 max-w-xs text-[10px] text-muted-foreground leading-3.5">
+                    {description}
+                  </CardDescription>
+                  <a
+                    className="mt-auto inline-flex items-center gap-1.5 pt-2 font-semibold text-[9px] text-primary uppercase tracking-wide group-hover:gap-2.5"
+                    href={href}
+                  >
+                    {action}{" "}
+                    <ArrowRight aria-hidden="true" className="size-3" />
+                  </a>
+                </div>
+              </CardHeader>
+            </Card>
           ))}
         </div>
+
+        <Capabilities />
+      </div>
+    </section>
+  );
+}
+
+function Capabilities() {
+  return (
+    <section className="mt-3 overflow-hidden rounded-xl bg-chart-2 text-primary-foreground shadow-chart-2/15 shadow-lg">
+      <div className="grid md:grid-cols-[215px_1fr]">
+        <div className="border-background/20 px-5 py-3 md:border-r">
+          <h2 className="font-serif text-lg tracking-[-0.02em]">
+            Built for modern teams
+          </h2>
+          <p className="mt-0.5 max-w-44 text-[10px] text-primary-foreground/80 leading-3">
+            From local development to real-world use.
+          </p>
+        </div>
+        <ul className="grid grid-cols-2 sm:grid-cols-5">
+          {CAPABILITIES.map(([Icon, label]) => (
+            <li
+              className="flex min-h-18 items-center justify-center gap-2 border-background/20 px-2 text-center text-[10px] text-primary-foreground/90 [&:not(:last-child)]:border-r"
+              key={label}
+            >
+              <Icon
+                aria-hidden="true"
+                className="size-4 shrink-0 text-accent"
+              />
+              <span>{label}</span>
+            </li>
+          ))}
+        </ul>
       </div>
     </section>
   );

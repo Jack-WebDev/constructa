@@ -61,7 +61,7 @@ describe("LivePreview", () => {
     const execute = vi.fn(() => ({ value: "sample" }));
     render(<LivePreview draft={createDraft("sample")} execute={execute} />);
 
-    fireEvent.change(screen.getByLabelText("Preview seed (optional)"), {
+    fireEvent.change(screen.getByLabelText("Fixed preview seed"), {
       target: { value: "replay" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Regenerate" }));
@@ -72,9 +72,7 @@ describe("LivePreview", () => {
     expect(execute).toHaveBeenCalledWith(expect.any(Object), {
       seed: "replay",
     });
-    expect(
-      screen.getByText(/not saved in the generator document/u),
-    ).not.toBeNull();
+    expect(screen.getByText(/not saved with this generator/u)).not.toBeNull();
     vi.useRealTimers();
   });
 
@@ -143,7 +141,9 @@ describe("LivePreview", () => {
     expect(screen.getByRole("alert").textContent).toContain(
       "Preview unavailable",
     );
-    expect(screen.getByRole("alert").textContent).toContain("configuration /");
+    expect(screen.getByRole("alert").textContent).toContain(
+      "min must be less than or equal to max",
+    );
     vi.useRealTimers();
   });
 

@@ -9,7 +9,7 @@ export function GeneratorDetail({ typeId }: { readonly typeId: string }) {
 
   if (entry === undefined) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-10 sm:px-6 sm:py-16">
+      <main className="app-page mx-auto w-full max-w-360 px-4 py-10 sm:px-6 sm:py-16">
         <section
           aria-labelledby="generator-not-found-title"
           className="rounded-2xl border border-dashed bg-card/50 p-8 text-center"
@@ -36,7 +36,7 @@ export function GeneratorDetail({ typeId }: { readonly typeId: string }) {
   );
 
   return (
-    <main className="app-page mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-12">
+    <main className="app-page mx-auto w-full max-w-360 px-4 py-8 sm:px-6 sm:py-12">
       <a
         className="inline-flex items-center gap-1 text-muted-foreground text-sm transition-colors hover:text-primary"
         href="/generators"

@@ -21,6 +21,51 @@ describe("QuickGenerateShell", () => {
     expect(screen.getByRole("status").textContent).toMatch(/^\d+$/u);
   });
 
+  it("provides reproducible advanced generation without adding UI settings to the definition", () => {
+    render(<QuickGenerateShell />);
+
+    expect(screen.getByText("Reproducibility")).not.toBeNull();
+    expect(screen.getByText("Value rules")).not.toBeNull();
+    expect(screen.getByText("Output format")).not.toBeNull();
+    expect(screen.getByText("Generation behavior")).not.toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/Seed/), {
+      target: { value: "repeatable" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    const firstResult = screen.getByLabelText("Generated result").textContent;
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate again" }));
+    expect(screen.getByLabelText("Generated result").textContent).toBe(
+      firstResult,
+    );
+    expect(screen.queryByText(/"seed"/)).toBeNull();
+  });
+
+  it("applies numeric rules and formatted string output", () => {
+    render(<QuickGenerateShell />);
+
+    fireEvent.change(screen.getByLabelText("Minimum"), {
+      target: { value: "0" },
+    });
+    fireEvent.change(screen.getByLabelText("Maximum"), {
+      target: { value: "100" },
+    });
+    fireEvent.change(screen.getByLabelText("Step"), {
+      target: { value: "100" },
+    });
+    fireEvent.change(screen.getByLabelText(/Exclude values/), {
+      target: { value: "100" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Return as string" }));
+    fireEvent.click(
+      screen.getByRole("switch", { name: "Pad with leading zeros" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    expect(screen.getByLabelText("Generated result").textContent).toBe("000");
+  });
+
   it("replaces the selected definition and exposes its configuration controls", () => {
     render(<QuickGenerateShell />);
 
@@ -41,9 +86,10 @@ describe("QuickGenerateShell", () => {
   it("uses a mobile-first layout with touch-sized controls and a bounded preview", () => {
     render(<QuickGenerateShell />);
 
-    expect(screen.getByRole("main").className).toContain(
-      "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
-    );
+    const layout = screen
+      .getByRole("heading", { name: "Generate one value." })
+      .closest("[class~='grid']");
+    expect(layout?.className).toContain("lg:grid-cols-2");
     expect(screen.getByLabelText("Generator").className).toContain("h-11");
     expect(screen.getByLabelText("Minimum").className).toContain("h-11");
     expect(
