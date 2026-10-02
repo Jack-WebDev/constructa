@@ -51,9 +51,18 @@ export function BuilderShell() {
   }
 
   return (
-    <main className="app-page mx-auto w-full max-w-[1600px] px-3 py-3 sm:px-5 sm:py-5">
-      <section className="builder-workspace overflow-hidden border border-border/80 bg-card/70">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-border/70 border-b px-4 py-3 sm:px-5">
+    <main className="app-page relative isolate min-h-svh overflow-hidden bg-background px-3 py-3 sm:px-5">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-20 bg-[length:100%_100%] bg-center opacity-95"
+        style={{ backgroundImage: 'url("/generators-bg.png")' }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-background/25"
+      />
+      <div className="mx-auto max-w-360">
+        <header className="flex flex-wrap items-center justify-between gap-4 px-1 pb-4">
           <div className="min-w-0">
             <p className="truncate font-medium text-muted-foreground text-xs">
               Constructa / Builder
@@ -83,7 +92,7 @@ export function BuilderShell() {
           </div>
         </header>
         {detailsOpen ? (
-          <section className="grid gap-6 border-border/70 border-b bg-muted/25 px-5 py-5 lg:grid-cols-3">
+          <section className="mb-2 grid gap-5 rounded-xl border border-border/80 bg-card/85 p-5 shadow-foreground/7 shadow-md lg:grid-cols-3">
             <BuilderIdentityEditor draft={draft} onDraftChange={setDraft} />
             <BuilderDocumentImport onImport={importDocument} />
             <div>
@@ -95,8 +104,8 @@ export function BuilderShell() {
             </div>
           </section>
         ) : null}
-        <div className="grid min-h-[calc(100svh-12rem)] lg:grid-cols-[minmax(15rem,.78fr)_minmax(22rem,1fr)_minmax(20rem,.9fr)]">
-          <aside className="border-border/70 border-b lg:border-r lg:border-b-0">
+        <div className="grid min-h-[calc(100svh-6.5rem)] gap-2 lg:grid-cols-[minmax(17rem,.82fr)_minmax(21rem,.92fr)_minmax(21rem,.95fr)]">
+          <aside className="min-h-0 overflow-y-auto rounded-xl border border-border/80 bg-card/85 shadow-foreground/7 shadow-md">
             <DefinitionEditor
               draft={draft}
               onDraftChange={setDraft}
@@ -105,7 +114,7 @@ export function BuilderShell() {
               validationIssues={validationIssues}
             />
           </aside>
-          <section className="border-border/70 border-b lg:border-r lg:border-b-0">
+          <section className="min-h-0 overflow-y-auto rounded-xl border border-border/80 bg-card/85 shadow-foreground/7 shadow-md">
             <FieldConfiguration
               draft={draft}
               onDraftChange={setDraft}
@@ -114,25 +123,24 @@ export function BuilderShell() {
               validationIssues={validationIssues}
             />
           </section>
-          <aside className="bg-muted/15 px-4 py-4 sm:px-5">
+          <aside className="min-h-0 overflow-y-auto">
             <LivePreview draft={draft} />
           </aside>
         </div>
-        <footer className="border-border/70 border-t px-4 py-2.5">
-          <BuilderValidationSummary
-            issues={validationIssues}
-            onFocus={(id) => {
-              const definition = draft.definitionIdentities.find(
-                (candidate) => candidate.id === id,
-              );
-              if (definition !== undefined) setSelectedPath(definition.path);
-            }}
-          />
-          {validationIssues.length === 0 ? (
-            <p className="text-muted-foreground text-xs">✓ Definition valid</p>
-          ) : null}
-        </footer>
-      </section>
+        {validationIssues.length > 0 ? (
+          <footer className="mt-2 rounded-xl border border-destructive/30 bg-card/90 px-4 py-3 shadow-sm">
+            <BuilderValidationSummary
+              issues={validationIssues}
+              onFocus={(id) => {
+                const definition = draft.definitionIdentities.find(
+                  (candidate) => candidate.id === id,
+                );
+                if (definition !== undefined) setSelectedPath(definition.path);
+              }}
+            />
+          </footer>
+        ) : null}
+      </div>
     </main>
   );
 }

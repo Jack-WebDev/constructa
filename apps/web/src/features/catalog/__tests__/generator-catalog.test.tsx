@@ -29,4 +29,18 @@ describe("GeneratorCatalog", () => {
       screen.getByRole("heading", { name: "No generators found" }),
     ).not.toBeNull();
   });
+
+  it("switches between the available grid and list layouts", () => {
+    render(<GeneratorCatalog />);
+
+    const gridButton = screen.getByRole("button", { name: "Grid" });
+    const listButton = screen.getByRole("button", { name: "List" });
+    expect(gridButton.getAttribute("aria-pressed")).toBe("true");
+    expect(listButton.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(listButton);
+
+    expect(gridButton.getAttribute("aria-pressed")).toBe("false");
+    expect(listButton.getAttribute("aria-pressed")).toBe("true");
+  });
 });

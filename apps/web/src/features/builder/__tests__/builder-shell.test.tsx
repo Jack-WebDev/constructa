@@ -16,7 +16,9 @@ describe("BuilderShell", () => {
     render(<BuilderShell />);
     expect(screen.getByText("Build your data")).not.toBeNull();
     expect(screen.getByText("Choose a field to configure")).not.toBeNull();
-    expect(screen.getByRole("heading", { name: "Result" })).not.toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Live preview" }),
+    ).not.toBeNull();
     expect(
       screen.getByRole("button", { name: "Generate data" }),
     ).not.toBeNull();
@@ -25,7 +27,9 @@ describe("BuilderShell", () => {
   it("adds a field, selects a generator, and exposes its contextual settings", () => {
     render(<BuilderShell />);
     fireEvent.click(screen.getByRole("button", { name: "Add field" }));
-    expect(screen.getByRole("heading", { name: "field" })).not.toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Field configuration" }),
+    ).not.toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Change generator" }));
     fireEvent.change(
       screen.getByRole("searchbox", { name: "Search generators" }),
@@ -61,7 +65,9 @@ describe("BuilderShell", () => {
         name: "Remove field",
       }),
     );
-    expect(screen.queryByRole("heading", { name: "field" })).toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Field configuration" }),
+    ).not.toBeNull();
     expect(screen.getByText("Choose a field to configure")).not.toBeNull();
   });
 

@@ -13,7 +13,14 @@ import { Button } from "@constructa/ui/components/button";
 import { Input } from "@constructa/ui/components/input";
 import { Label } from "@constructa/ui/components/label";
 import type { ValidationPath } from "constructa-sdk";
-import { ChevronDown, ChevronRight, Plus, TriangleAlert } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Plus,
+  Search,
+  TriangleAlert,
+} from "lucide-react";
 import { useState } from "react";
 
 import type { DefinitionProperties } from "../editor/controls";
@@ -55,33 +62,72 @@ export type DefinitionEditorProps = {
  * a single, distinct job: showing shape and configuring the selection.
  */
 export function DefinitionEditor(props: DefinitionEditorProps) {
+  const [query, setQuery] = useState("");
+
   return (
     <section aria-labelledby="builder-fields-title" className="min-h-0">
-      <div className="flex items-center justify-between gap-3 px-4 py-4">
+      <div className="flex items-start justify-between gap-3 px-4 pt-4">
         <div>
-          <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-[0.14em]">
-            Structure
-          </p>
-          <h2 className="mt-1 font-medium text-base" id="builder-fields-title">
-            Your fields
+          <h2 className="font-semibold text-base" id="builder-fields-title">
+            Dataset structure
           </h2>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Define the fields that make up your dataset.
+          </p>
         </div>
         {getBuilderObjectFields(props.draft, ["definition"]).length > 0 ? (
           <AddFieldButton {...props} objectPath={["definition"]} />
         ) : null}
       </div>
-      <div className="border-border/70 border-t px-2 py-2">
-        <DefinitionTree {...props} objectPath={["definition"]} />
+      <div className="relative mx-4 mt-4">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground"
+        />
+        <Label className="sr-only" htmlFor="builder-field-search">
+          Search fields
+        </Label>
+        <Input
+          className="h-9 rounded-lg border-border/70 bg-muted/35 pl-9 text-xs"
+          id="builder-field-search"
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Search fields..."
+          type="search"
+          value={query}
+        />
+      </div>
+      <div className="px-3 py-3">
+        <DefinitionTree {...props} objectPath={["definition"]} query={query} />
       </div>
     </section>
   );
 }
 
 function DefinitionTree(
-  props: DefinitionEditorProps & { readonly objectPath: ValidationPath },
+  props: DefinitionEditorProps & {
+    readonly objectPath: ValidationPath;
+    readonly query: string;
+  },
 ) {
-  const fields = getBuilderObjectFields(props.draft, props.objectPath);
+  const allFields = getBuilderObjectFields(props.draft, props.objectPath);
+  const normalizedQuery = props.query.trim().toLocaleLowerCase();
+  const fields = allFields.filter((field) => {
+    return (
+      normalizedQuery === "" ||
+      field.name.toLocaleLowerCase().includes(normalizedQuery) ||
+      definitionSummary(field.definition, 0)
+        .toLocaleLowerCase()
+        .includes(normalizedQuery)
+    );
+  });
   if (fields.length === 0) {
+    if (allFields.length > 0) {
+      return (
+        <p className="px-3 py-6 text-center text-muted-foreground text-xs">
+          No matching fields.
+        </p>
+      );
+    }
     return props.objectPath.length === 1 ? (
       <EmptyStructure {...props} />
     ) : (
@@ -114,6 +160,7 @@ function DefinitionTreeItem(
     readonly field: BuilderFieldDraft;
     readonly fieldCount: number;
     readonly fieldIndex: number;
+    readonly query: string;
   },
 ) {
   const { draft, field, fieldCount, fieldIndex, onDraftChange, onSelect } =
@@ -137,12 +184,16 @@ function DefinitionTreeItem(
   return (
     <li id={`builder-field-${field.id}`}>
       <div
-        className={`group flex min-h-12 items-center gap-1 border-l-2 px-2 ${
+        className={`group flex min-h-12 items-center gap-1 rounded-lg border-l-2 px-2 ${
           isSelected
             ? "border-primary bg-primary/8"
             : "border-transparent hover:bg-muted/55"
         }`}
       >
+        <GripVertical
+          aria-hidden="true"
+          className="size-3 shrink-0 text-muted-foreground/70"
+        />
         {canExpand ? (
           <Button
             aria-label={`${expanded ? "Collapse" : "Expand"} ${field.name}`}
@@ -202,7 +253,7 @@ function DefinitionTreeItem(
         ) : null}
       </div>
       {canExpand && expanded ? (
-        <div className="ml-5 border-border/70 border-l pl-1">
+        <div className="ml-6 border-border/70 border-l pl-1">
           {type === "object" ? (
             <DefinitionTree {...props} objectPath={field.path} />
           ) : (
@@ -283,8 +334,17 @@ export function FieldConfiguration(props: DefinitionEditorProps) {
     props.selectedPath === undefined
       ? undefined
       : findField(props.draft, props.selectedPath);
-  if (definition === undefined || props.selectedPath === undefined)
-    return <EmptyConfiguration />;
+  if (definition === undefined || props.selectedPath === undefined) {
+    return (
+      <section
+        aria-labelledby="field-configuration-title"
+        className="min-h-0 overflow-y-auto px-5 py-5 sm:px-6"
+      >
+        <ConfigurationHeader />
+        <EmptyConfiguration />
+      </section>
+    );
+  }
 
   const type = getDefinitionType(definition);
   const Editor =
@@ -326,24 +386,10 @@ export function FieldConfiguration(props: DefinitionEditorProps) {
       aria-labelledby="field-configuration-title"
       className="min-h-0 overflow-y-auto px-5 py-5 sm:px-6"
     >
-      <p className="truncate text-muted-foreground text-xs">
-        {pathLabels(props.selectedPath).join(" / ")}
-      </p>
-      <div className="mt-2 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="font-medium text-xl" id="field-configuration-title">
-            {selectedField?.name ?? "Array item"}
-          </h2>
-          <p className="mt-1 text-muted-foreground text-sm">
-            Configure what this part of your data generates.
-          </p>
-        </div>
-        <span className="border px-2 py-1 font-medium text-xs">
-          {definitionSummary(definition, 0)}
-        </span>
-      </div>
+      <ConfigurationHeader definition={definition} />
+      <p className="sr-only">{pathLabels(props.selectedPath).join(" / ")}</p>
       {selectedField === undefined ? null : (
-        <div className="mt-6 grid gap-1.5">
+        <div className="mt-5 grid gap-1.5">
           <Label htmlFor="field-name">Field name</Label>
           <Input
             defaultValue={selectedField.name}
@@ -353,7 +399,7 @@ export function FieldConfiguration(props: DefinitionEditorProps) {
           />
         </div>
       )}
-      <section className="mt-6">
+      <section className="mt-5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h3 className="font-medium text-sm">Generator</h3>
@@ -375,8 +421,8 @@ export function FieldConfiguration(props: DefinitionEditorProps) {
           <GeneratorPicker onSelect={chooseGenerator} selectedType={type} />
         ) : null}
       </section>
-      <section className="mt-6 border-border/70 border-t pt-5">
-        <h3 className="font-medium text-sm">Settings</h3>
+      <section className="mt-5 border-border/70 border-t pt-5">
+        <h3 className="font-semibold text-sm">Generator options</h3>
         {Editor === undefined ? (
           <p className="mt-3 text-destructive text-sm">
             This generator is unavailable.
@@ -480,6 +526,30 @@ function EmptyConfiguration() {
         </p>
       </div>
     </section>
+  );
+}
+
+function ConfigurationHeader({
+  definition,
+}: {
+  readonly definition?: DefinitionProperties;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div>
+        <h2 className="font-semibold text-base" id="field-configuration-title">
+          Field configuration
+        </h2>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          Configure how this field generates data.
+        </p>
+      </div>
+      {definition === undefined ? null : (
+        <span className="rounded-lg bg-primary/10 px-2.5 py-1 font-medium text-[10px] text-primary">
+          {definitionSummary(definition, 0)}
+        </span>
+      )}
+    </div>
   );
 }
 

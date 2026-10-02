@@ -21,7 +21,7 @@ export default function Header() {
       <header className="sticky top-0 z-40 bg-background/70 backdrop-blur-sm">
         <nav
           aria-label="Primary navigation"
-          className="mx-auto flex h-17 max-w-[960px] items-center justify-between px-4 sm:px-0"
+          className="mx-auto flex h-17 max-w-360 items-center justify-between px-4 sm:px-0"
         >
           <Link
             aria-label="Constructa home"
