@@ -6,19 +6,19 @@ import { Homepage } from "../homepage";
 afterEach(cleanup);
 
 describe("Homepage", () => {
-  it("communicates composition and renders the primitive-to-object example", () => {
+  it("communicates composition and renders an employee-generator example", () => {
     render(<Homepage />);
 
     expect(
       screen.getByRole("heading", { name: "Generate what you need." }),
     ).not.toBeNull();
     expect(
-      screen.getByRole("heading", { name: "Employee generator" }),
+      screen.getByRole("region", { name: "Employee generator" }),
     ).not.toBeNull();
     expect(
-      screen.getByRole("list", { name: "Primitive generators" }),
+      screen.getByRole("list", { name: "Employee generator fields" }),
     ).not.toBeNull();
-    expect(screen.getByText("UUID")).not.toBeNull();
+    expect(screen.getByText("Integer")).not.toBeNull();
     expect(screen.getByText("Boolean")).not.toBeNull();
     expect(screen.getByText(/"employeeNumber"/u)).not.toBeNull();
   });
@@ -27,10 +27,10 @@ describe("Homepage", () => {
     render(<Homepage />);
 
     expect(
-      screen.getByRole("link", { name: "Start Building" }).getAttribute("href"),
+      screen.getByRole("link", { name: "Start building" }).getAttribute("href"),
     ).toBe("/builder");
     expect(
-      screen.getByRole("link", { name: "Quick Generate" }).getAttribute("href"),
+      screen.getByRole("link", { name: "Quick generate" }).getAttribute("href"),
     ).toBe("/quick-generate");
   });
 

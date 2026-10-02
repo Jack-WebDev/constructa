@@ -1,5 +1,5 @@
 import { Badge } from "@constructa/ui/components/badge";
-import { Button } from "@constructa/ui/components/button";
+import { buttonVariants } from "@constructa/ui/components/button";
 import {
   Card,
   CardContent,
@@ -152,8 +152,7 @@ function Hero() {
             id="homepage-title"
             className="mt-7 font-serif text-5xl leading-[0.94] tracking-[-0.055em] sm:text-6xl lg:text-[4rem]"
           >
-            Generate
-            <br />
+            Generate <br />
             what <em className="font-normal text-primary">you</em> need.
           </h1>
 
@@ -163,21 +162,27 @@ function Hero() {
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Button
-              render={<a href="/builder" />}
-              size="lg"
-              className="h-12 rounded-xl px-7 text-sm shadow-lg shadow-primary/20 hover:bg-primary-hover"
+            <a
+              className={buttonVariants({
+                className:
+                  "h-12 rounded-xl px-7 text-sm shadow-lg shadow-primary/20 hover:bg-primary-hover",
+                size: "lg",
+              })}
+              href="/builder"
             >
               Start building <ArrowRight className="size-4" />
-            </Button>
-            <Button
-              render={<a href="/quick-generate" />}
-              size="lg"
-              variant="outline"
-              className="h-12 rounded-xl border-border/90 bg-card/75 px-7 text-foreground text-sm shadow-sm hover:bg-card"
+            </a>
+            <a
+              className={buttonVariants({
+                className:
+                  "h-12 rounded-xl border-border/90 bg-card/75 px-7 text-foreground text-sm shadow-sm hover:bg-card",
+                size: "lg",
+                variant: "outline",
+              })}
+              href="/quick-generate"
             >
               <Play className="size-3.5" /> Quick generate
-            </Button>
+            </a>
           </div>
 
           <ul className="mt-8 grid gap-4 text-left sm:grid-cols-3 sm:gap-3">

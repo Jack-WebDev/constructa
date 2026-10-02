@@ -86,9 +86,10 @@ describe("QuickGenerateShell", () => {
   it("uses a mobile-first layout with touch-sized controls and a bounded preview", () => {
     render(<QuickGenerateShell />);
 
-    expect(screen.getByRole("main").className).toContain(
-      "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]",
-    );
+    const layout = screen
+      .getByRole("heading", { name: "Generate one value." })
+      .closest("[class~='grid']");
+    expect(layout?.className).toContain("lg:grid-cols-2");
     expect(screen.getByLabelText("Generator").className).toContain("h-11");
     expect(screen.getByLabelText("Minimum").className).toContain("h-11");
     expect(
